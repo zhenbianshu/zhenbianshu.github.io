@@ -10,7 +10,7 @@ url: https://zhenbianshu.github.io
 # be the project name.
 # *** IMPORTANT: If your local "jekyll serve" throws errors change this to '' or
 #     run it like so: jekyll serve --baseurl=''
-baseurl: /jekyll-clean
+baseurl: ''
 
 # These can be '' to hide the Github or Gitlab nav buttons
 github: 'scotte/jekyll-clean'
