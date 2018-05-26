@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>枕边书</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="/jekyll-clean/js/jquery.min.js"></script>
+    <script src="/jekyll-clean/js/bootstrap.min.js"></script>
+    <link href="/jekyll-clean/css/bootstrap.min.css" rel="stylesheet" type="text/css">
+    <link href="/jekyll-clean/css/theme.css" rel="stylesheet" type="text/css">
+    <link href="/jekyll-clean/css/syntax.css" rel="stylesheet" type="text/css">
+
+
+</head>
+
+<body>
+
+<div class="container-fluid">
+    <div class="row-fluid">
+        <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                  <span class="sr-only">Toggle navigation</span>
+                  <span class="icon-bar"></span>
+                  <span class="icon-bar"></span>
+                  <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="/jekyll-clean/">枕边书</a>
+              </div>
+              <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav">
+                    <li class="active"><a href="/jekyll-clean/">Home</a></li>
+                    <li class="active visible-xs-block"><a href="/jekyll-clean/links.html">Links</a></li>
+                    <li class="active"><a href="/jekyll-clean/archive.html">Archive</a></li>
+                    <li class="active"><a href="/jekyll-clean/about.html">About</a></li>
+                    <li class="active"><a href="/jekyll-clean/feed.xml">RSS</a></li>
+                    
+                    
+                      <li class="active"><a href="https://github.com/scotte/jekyll-clean">Github</a></li>
+                    
+                </ul>
+              </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="container container-left">
+    <div class="row">
+        <div class="col-md-3 hidden-xs">
+            <div class="sidebar well">
+常怀敬畏之心
+</div>
+
+<div class="sidebar well">
+    <h1>Recent Posts</h1>
+    <ul>
+        
+          <li><a href="/jekyll-clean/2014/08/jekyll-clean-theme">Jekyll Clean Theme</a></li>
+        
+          <li><a href="/jekyll-clean/2014/07/Lorem-ipsum-dolor-sit-amet">Lorem ipsum dolor sit amet</a></li>
+        
+          <li><a href="/jekyll-clean/2014/06/Maecenas-feugiat-fringilla-nibh">Maecenas feugiat fringilla nibh</a></li>
+        
+          <li><a href="/jekyll-clean/2013/06/Cum-sociis-natoque-penatibus">Cum sociis natoque penatibus</a></li>
+        
+          <li><a href="/jekyll-clean/2013/05/Nulla-vel-risus-dapibus">Nulla vel risus dapibus</a></li>
+        
+    </ul>
+</div>
+
+<div class="sidebar well">
+<h1>Links</h1>
+<ul>
+  <li><a href="#">One</a></li>
+  <li><a href="#">Two</a></li>
+  <li><a href="#">Three</a></li>
+  <li><a href="#">Four</a></li>
+</ul>
+
+</div>
+
+        </div>
+        <div class="col-md-9">
+          <div class="article">
+            <div class="well">
+                <h1><a href="/jekyll-clean/2014/08/jekyll-clean-theme">Aug 23, 2014 - Jekyll Clean Theme</a></h1>
+            
+            <div class="post-content">
+            <ul>
+  <li>Get it from <a href="https://github.com/scotte/jekyll-clean">github</a>.</li>
+  <li>See the <a href="https://scotte.github.io/jekyll-clean">live demo</a>.</li>
+  <li>See it <a href="https://scotte.org">in action on my own blog</a>.</li>
+</ul>
+
+<p>Welcome to the sample post for the Jekyll Clean theme.</p>
+
+<p>A simple and clean Jekyll theme using <a href="http://getbootstrap.com">bootstrap</a>
+(not to be confused with jekyll-bootstrap) that’s easy to modify and very
+modular in component and element reuse.</p>
+
+<p>It uses Disqus for comments and includes Google Analytics support. Both of
+these features are disabled by default and can be enabled via _config.yml. You
+can also rip this code out of the templates if you like (footer.html and post.html).
+The beauty of Jekyll - keep things clean… Jekyll Clean!</p>
+
+<p>The theme works well on mobile phones, using a collapsable nav bar and hiding the
+sidebar. The links pane in the sidebar is available on mobile through the nav menu,
+and you can do the same thing for any other sections added to the sidebar.</p>
+
+<p>Don’t forget to occassionally merge against my upstream repository so you can get
+the latest changes. Pull requests are encouraged and accepted!</p>
+
+<h1 id="installation">Installation</h1>
+
+<p>If you don’t have a blog already on github, start by cloning this repository.
+Best to do that directly on github and then clone that down to your computer.</p>
+
+<p>If you already do have a blog, You can certainly apply this theme to your existing
+blog in place, but then you won’t be able to merge as the theme changes. If you
+re-apply your blog history on top of this theme’s <strong>gh-pages</strong> branch, it’s then
+easy to update to the latest version of the theme. You also don’t want to have to
+deal with resolving old conflicts from your existing history, so you may wish to to
+push your existing master off to a new branch so you have the old history and start
+a new branch with this as the start, merging in your _posts and other assets (after
+git rm’ing the current _posts.</p>
+
+<p>Not ideal, but you have to make a choice - either apply it manually or base your
+blog off this theme’s branch. Either way it will work, and both have their own
+pros and cons.</p>
+
+<p>You can setup an upstream tracking repository like so:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ git remote add upstream git@github.com:scotte/jekyll-clean.git
+</code></pre></div>
+<p>And now when you wish to merge your own branch onto the latest version of the
+theme, simply do:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ git fetch upstream
+$ git merge upstream/gh-pages
+</code></pre></div>
+
+<p>Of course you will have to resolve conflicts for _config.yml, _includes/links-list.html,
+and _posts, and so on, but in practice this is pretty simple.</p>
+
+<p>This is how I maintain my own blog which is based on this theme. The old history is
+sitting in an <strong>old-master</strong> branch that I can refer to when I need to.</p>
+
+<h1 id="running-locally">Running Locally</h1>
+
+<p>Here’s the exact set of packages I need to install on Debian to run jekyll
+locally with this theme for testing.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ sudo aptitude install ruby ruby-dev rubygems nodejs
+$ sudo gem install jekyll jekyll-paginate
+</code></pre></div>
+
+<p>And then it’s just a simple matter of running jekyll locally:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>$ jekyll serve --baseurl=''
+</code></pre></div>
+
+<p>Now browse to http://127.0.0.1:4000</p>
+
+<h1 id="using-gh-pages">Using gh-pages</h1>
+
+<p>Running a jekyll site is a bit outside the scope of this doc, but
+sometimes it can be a bit confusing how to configure jekyll for
+project pages versus user pages, for example.</p>
+
+<p>To start with, read through
+<a href="https://help.github.com/articles/user-organization-and-project-pages/">the documentation here</a>.
+This will provide a good overview on how it all works. The git branch and
+baseurl (in _config.yml) will change depending on the sort of site deployed.</p>
+
+<p>When you clone this repository, it’s set up for project pages, so the
+deployed branch is “gh-pages” and baseurl is configured to ‘jekyll-clean’,
+because that’s the name of this project.</p>
+
+<p>If you plan to deploy this as user pages, the deployed branch is “master”
+and baseurl is configured to ‘’ (i.e. empty).</p>
+
+<h1 id="comment-systems">Comment Systems</h1>
+
+<p>Jekyll clean supports both <a href="https://posativ.org/isso">isso</a> and
+<a href="https://disqus.com">disqus</a> comment systems.</p>
+
+<p>After enabling <strong>comments</strong>, either <strong>isso</strong> or <strong>disquss</strong> must
+be configured. Don’t try configuring both!</p>
+
+<h1 id="isso-comments">Isso Comments</h1>
+
+<p>Isso requires running a local server, so is not suitable for hosting
+in github pages, for example. Isso is open source and keeps all your
+data local, unlike Disqus (who knows exactly what they are doing with
+your data).</p>
+
+<p>In _config.yml you’ll need to set <strong>isso</strong> to the fully-qualified URL
+if your isso server (this is the value for <strong>data-isso</strong> passed to the
+isso JS). Make sure <strong>comments</strong> is true.</p>
+
+<h1 id="disqus-comments">Disqus Comments</h1>
+
+<p>Getting Disqus to work can be a bit more work than it seems like it should be.
+Make sure your Disqus account is correctly configured with the right domain
+of your blog and you know your Disqus shortname.</p>
+
+<p>In _config.yml you’ll need to set <strong>disqus</strong> to your Disqus shortname and
+make sure <strong>comments</strong> is true.</p>
+
+<p>Finally, in posts, make sure you have <strong>comments: true</strong> in the YAML front
+matter.</p>
+
+<p>More information on using Disqus with Jekyll is
+<a href="https://help.disqus.com/customer/portal/articles/472138-jekyll-installation-instructions">documented here</a>.</p>
+
+<h1 id="code-syntax-highlighting">Code Syntax Highlighting</h1>
+
+<p>To use code syntax highlighting, use the following syntax:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>```python
+import random
+
+# Roll the die
+roll = random.randint(1, 20)
+print('You rolled a %d.' % roll)
+``` #REMOVE
+</code></pre></div>
+
+<p>(Remove #REMOVE from the end of the last line). Which will look like this in
+the rendered jekyll output using the default css/syntax.css provided with this
+theme (which is the <strong>colorful</strong> theme from <a href="https://github.com/iwootten/jekyll-syntax">https://github.com/iwootten/jekyll-syntax</a>):</p>
+
+<div class="language-python highlighter-rouge"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">random</span>
+
+<span class="c"># Roll the die</span>
+<span class="n">roll</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="s">'You rolled a </span><span class="si">%</span><span class="s">d.'</span> <span class="o">%</span> <span class="n">roll</span><span class="p">)</span>
+</code></pre></div>
+
+<p>You can, of course, use any theme you wish, see the jekyll and pygments
+documentation for more details.</p>
+
+<h1 id="license">License</h1>
+
+<p>The content of this theme is distributed and licensed under a
+<img src="/jekyll-clean/images/cc_by_88x31.png" alt="License Badge" />
+<a href="https://creativecommons.org/licenses/by/4.0/legalcode">Creative Commons Attribution 4.0 License</a></p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>This license lets others distribute, remix, tweak, and build upon your work,
+even commercially, as long as they credit you for the original creation. This
+is the most accommodating of licenses offered. Recommended for maximum
+dissemination and use of licensed materials.
+</code></pre></div>
+
+<p>In other words: you can do anything you want with this theme on any site, just please
+provide a link to <a href="https://github.com/scotte/jekyll-clean">the original theme on github</a>
+so I get credit for the original design. Beyond that, have at it!</p>
+
+<p>This theme includes the following files which are the properties of their
+respective owners:</p>
+
+<ul>
+  <li>js/bootstrap.min.js - <a href="http://getbootstrap.com">bootstrap</a></li>
+  <li>css/bootstrap.min.css - <a href="http://getbootstrap.com">bootstrap</a></li>
+  <li>js/jquery.min.js - <a href="https://jquery.com">jquery</a></li>
+  <li>images/cc_by_88x31.png - <a href="https://creativecommons.org">creative commons</a></li>
+  <li>css/colorful.css - <a href="https://github.com/iwootten/jekyll-syntax">iwootten/jekyll-syntax</a></li>
+</ul>
+
+            </div>
+            
+            </div>
+          </div>
+          <div class="pagination">
+              
+              
+                <a class="btn btn-default" href="/jekyll-clean/2014/07/Lorem-ipsum-dolor-sit-amet" class="previous">Older Post</a>
+              
+          </div>
+        </div>
+    </div>
+</div>
+
+
+
+<div class="container-fluid">
+    <div class="row-fluid">
+        <div class="span12 footer navbar-inverse navbar-fixed-bottom">
+            <p class="copyright">&copy;2018 枕边书. Powered by <a href="http://jekyllrb.com">Jekyll</a>, theme by <a href="https://github.com/scotte/jekyll-clean">Scott Emmons</a>
+            under
+            <a href="http://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution</a></p>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+</body>
+</html>
+
