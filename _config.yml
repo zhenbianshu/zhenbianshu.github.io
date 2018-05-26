@@ -27,7 +27,7 @@ comments: true
 isso: ''
 
 # Set this to your disqus shortname to enable comments via disqus. Set to '' to disable disqus.
-disqus: ''
+disqus: 'zhenbianshu'
 
 permalink: /:year/:month/:title
 paginate: 3
