@@ -1,31 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="dd741df0-9bfa-4703-9063-c522c6665e1f" name="Default" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change beforePath="$PROJECT_DIR$/LICENSE" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/README.md" afterPath="$PROJECT_DIR$/README.md" />
-      <change beforePath="$PROJECT_DIR$/_config.yml" afterPath="$PROJECT_DIR$/_config.yml" />
-      <change beforePath="$PROJECT_DIR$/_includes/links-list.html" afterPath="$PROJECT_DIR$/_includes/links-list.html" />
-      <change beforePath="$PROJECT_DIR$/_site/2012/05/Vivamus-porttitor-porta-tortor.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/2013/05/Nulla-vel-risus-dapibus.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/2013/06/Cum-sociis-natoque-penatibus.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/2014/06/Maecenas-feugiat-fringilla-nibh.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/2014/07/Lorem-ipsum-dolor-sit-amet.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/2014/08/jekyll-clean-theme.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/about.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/archive.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/css/bootstrap.min.css" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/css/syntax.css" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/css/theme.css" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/feed.xml" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/images/cc_by_88x31.png" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/index.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/js/bootstrap.min.js" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/js/jquery.min.js" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/links.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/_site/page2/index.html" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/feed.xml" afterPath="" />
+    <list default="true" id="dd741df0-9bfa-4703-9063-c522c6665e1f" name="Default" comment="delete useless file;">
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" afterPath="" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" afterPath="" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="" />
+      <change beforePath="$PROJECT_DIR$/.idea/zhenbianshu.github.io.iml" afterPath="" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -83,11 +63,21 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="_config.yml" pinned="false" current-in-tab="true">
+      <file leaf-file-name="_config.yml" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/_config.yml">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="171">
-              <caret line="9" column="22" lean-forward="true" selection-start-line="9" selection-start-column="22" selection-end-line="9" selection-end-column="22" />
+              <caret line="9" column="22" lean-forward="false" selection-start-line="9" selection-start-column="22" selection-end-line="9" selection-end-column="22" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="workspace.xml" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/.idea/workspace.xml">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="437">
+              <caret line="19" column="167" lean-forward="true" selection-start-line="19" selection-start-column="167" selection-end-line="19" selection-end-column="167" />
               <folding />
             </state>
           </provider>
@@ -221,6 +211,11 @@
             <path>
               <item name="zhenbianshu.github.io" type="b2602c69:ProjectViewProjectNode" />
               <item name="zhenbianshu.github.io" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="zhenbianshu.github.io" type="b2602c69:ProjectViewProjectNode" />
+              <item name="zhenbianshu.github.io" type="462c0819:PsiDirectoryNode" />
+              <item name=".idea" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="zhenbianshu.github.io" type="b2602c69:ProjectViewProjectNode" />
@@ -502,11 +497,18 @@
       <option name="project" value="LOCAL" />
       <updated>1527328319151</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="delete useless file;">
+      <created>1527328648620</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1527328648620</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="3070000" />
+    <option name="totallyTimeSpent" value="3432000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-1080" y="-1020" width="1080" height="1920" extended-state="6" />
@@ -547,7 +549,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="customize" />
     <MESSAGE value="index beautify;" />
-    <option name="LAST_COMMIT_MESSAGE" value="index beautify;" />
+    <MESSAGE value="delete useless file;" />
+    <option name="LAST_COMMIT_MESSAGE" value="delete useless file;" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager />
@@ -762,7 +765,15 @@
     <entry file="file://$PROJECT_DIR$/_config.yml">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="171">
-          <caret line="9" column="22" lean-forward="true" selection-start-line="9" selection-start-column="22" selection-end-line="9" selection-end-column="22" />
+          <caret line="9" column="22" lean-forward="false" selection-start-line="9" selection-start-column="22" selection-end-line="9" selection-end-column="22" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/.idea/workspace.xml">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="437">
+          <caret line="19" column="167" lean-forward="true" selection-start-line="19" selection-start-column="167" selection-end-line="19" selection-end-column="167" />
           <folding />
         </state>
       </provider>
