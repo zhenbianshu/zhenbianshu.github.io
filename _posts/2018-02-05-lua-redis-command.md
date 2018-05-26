@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "用Lua定制Redis命令"
-date: 2018-02-05 16:25:06 -0700
+date: 2018-02-05 16:25:06 +0800
 comments: true
 ---
 

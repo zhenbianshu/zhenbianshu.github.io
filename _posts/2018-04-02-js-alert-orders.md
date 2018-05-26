@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "JavaScript Alert函数执行顺序问题"
-date: 2018-04-02 16:25:06 -0700
+date: 2018-04-02 16:25:06 +0800
 comments: true
 ---
 
