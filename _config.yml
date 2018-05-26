@@ -1,14 +1,14 @@
-title: Researcher
-url: "https://ankitsultana.com"
-baseurl: "/researcher"
+title: 枕边书
+url: "https://zhenbianshu.github.io"
+baseurl: "/"
 
 markdown: kramdown
 
 tracking_id: #
 
 footer: yes
-footer_url: "https://github.com/bk2dcradle"
-footer_text: "Page design by Ankit Sultana"
+footer_url: "https://github.com/zhenbianshu"
+footer_text: "be in awe"
 
 sass:
     style: compressed
