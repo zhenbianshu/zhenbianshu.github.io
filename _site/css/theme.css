@@ -1,6 +1,7 @@
 body {
     padding-top: 60px;
     padding-bottom: 60px;
+    font-family: "PT Mono";
 }
 
 .copyright {
@@ -48,4 +49,18 @@ body {
 
 .author a {
     color: #ee4444;
+}
+
+img {
+    width: 100%;
+}
+
+h2, h3, h4, h5, h6 {
+    color: #ee4444;
+    font-family: "PT Mono";
+}
+
+h2 {
+    margin-bottom: -15px;
+    margin-top: 25px;
 }

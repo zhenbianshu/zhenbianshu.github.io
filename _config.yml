@@ -1,32 +1,14 @@
-# Jekyll configuration
-
 name: 枕边书
 description: 常怀敬畏之心。
-
-# url is currently only used only for the RSS feed in feed.xml
 url: https://zhenbianshu.github.io
-
-# baseurl will often be '', but for a project page on gh-pages, it needs to
-# be the project name.
-# *** IMPORTANT: If your local "jekyll serve" throws errors change this to '' or
-#     run it like so: jekyll serve --baseurl=''
 baseurl: ''
-
-# These can be '' to hide the Github or Gitlab nav buttons
 github: 'zhenbianshu'
 
 # Set this to your UA-# value, or '' to disable the block completely
 gaaccount: ''
 
-# The 'comments' setting enables comments. You'll need to select either
-# disqus or isso below to choose a comment system. Individual posts can
-# override 'comments' to disable on a post-by-post basis.
+# 评论
 comments: true
-
-# Set this to your public isso URL to enable comments via isso. Set to '' to disable isso.
-isso: ''
-
-# Set this to your disqus shortname to enable comments via disqus. Set to '' to disable disqus.
 disqus: 'zhenbianshu'
 
 permalink: /:year/:month/:title
@@ -37,3 +19,9 @@ markdown: kramdown
 gems: ['jekyll-paginate']
 
 exclude: ['README.md']
+
+
+# 文章相关配置
+article:
+  copyright: 转载随意，请注明来源地址：https://zhenbianshu.github.io
+  summary: 关于本文有什么疑问可以在下面留言交流，如果您觉得本文对您有帮助，欢迎关注我的 <a href="https://weibo.com/u/5715965217">微博</a> 或  <a href="https://github.com/zhenbianshu/">GitHub</a>。
