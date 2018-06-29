@@ -149,7 +149,7 @@ public class AuthParamResolver implements HandlerMethodArgumentResolver {
 ### 扩展
 当然，使用参数解析器也需要单独配置，我们同样在 `WebMvcConfigurerAdapter ` 内配置：
 
-```
+```java
 @Configuration
 public class MvcConfiguration extends WebMvcConfigurerAdapter {
 
@@ -171,7 +171,7 @@ Filter 并不是 Spring 提供的，它是在 Servlet 规范中定义的，是 S
 另外，在一个 Filter 中要显示调用 FilterChain 的 doFilter 方法，不然认为请求被拦截。
 实现类似：
 
-```
+```java
 public class WhitelistFilter implements javax.servlet.Filter {
 
     @Override
@@ -194,7 +194,7 @@ public class WhitelistFilter implements javax.servlet.Filter {
 ### 扩展
 Filter 也需要显示配置：
 
-```
+```java
 @Configuration
 public class FilterConfiguration {
 
