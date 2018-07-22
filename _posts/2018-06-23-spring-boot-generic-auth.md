@@ -5,6 +5,8 @@ date: 2018-06-23 20:00:06 +0800
 comments: true
 ---
 
+文章介绍了spring-boot中实现通用auth的四种方式，包括 传统AOP、拦截器、参数解析器和过滤器，并提供了对应的实例代码，最后简单总结了下他们的执行顺序。
+
 ## 前言
 ---
 
@@ -61,7 +63,7 @@ public class WhitelistAspect {
 
 ## Interceptor
 ---
-Spring 的 拦截器(Interceptor) 实现这个功能非常合适，顾名思义，拦截器用于在 Controller 内 Action 被执行前通过一些参数判断是否要执行此方法，要实现一个拦截器，可以实现 Spring 的 `HandlerInterceptor` 接口。
+Spring 的 拦截器(Interceptor) 实现这个功能也非常合适。顾名思义，拦截器用于在 Controller 内 Action 被执行前通过一些参数判断是否要执行此方法，要实现一个拦截器，可以实现 Spring 的 `HandlerInterceptor` 接口。
 
 ### 实现
 实现步骤如下：
@@ -97,7 +99,7 @@ public class WhitelistInterceptor implements HandlerInterceptor {
 ```
 
 ### 扩展
-要启用 拦截器还要显示配置它启用，这里我们使用 `WebMvcConfigurerAdapter` 对它进行配置。需要注意，继承它的的 `MvcConfiguration` 需要在 ComponentScan 路径下。
+要启用 拦截器还要显式配置它启用，这里我们使用 `WebMvcConfigurerAdapter` 对它进行配置。需要注意，继承它的的 `MvcConfiguration` 需要在 ComponentScan 路径下。
 
 
 ```java
@@ -160,7 +162,7 @@ public class MvcConfiguration extends WebMvcConfigurerAdapter {
 }
 ```
 
-这次实现完了，我还有些不放心，于是在网上查找是否还有其他方式可以实现此功能，常见的还有 `Filter`。
+这次实现完了，我还有些不放心，于是在网上查找是否还有其他方式可以实现此功能，发现常见的还有 `Filter`。
 
 ## Filter
 ---
@@ -214,9 +216,9 @@ public class FilterConfiguration {
 ---
 四种实现方式都有其适合的场景，那么它们之间的调用顺序如何呢？
 
-Filter 是 Servlet 实现的，自然是最先被调用，后续被调用的是 Interceptor 被拦截了自然不需要后续再进行处理，然后是 参数解析器，最后才是 切面的切点。
+Filter 是 Servlet 实现的，自然是最先被调用，后续被调用的是 Interceptor 被拦截了自然不需要后续再进行处理，然后是 参数解析器，最后才是 切面的切点。我将四种方式在一个项目内全部实现后，输出日志也证明了这个结论。
 
-这些实现方式在 Spring 里都是 AOP。由于之前自己的编程方式更偏向于面向过程编程，在使用 Java 面向对象后对比 AOP 和 面向过程中的勾子，有些感悟，改日写文整理一下。
+跳出具体实现，转身来看这些实现，其实都有一些面向切面的影子。由于之前自己的编程方式更偏向于面向过程编程，在使用 Java 面向对象后对比 AOP 和 面向过程中的勾子，有些感悟，改日写文整理一下。
 
 {{ site.article.summary }}
 
