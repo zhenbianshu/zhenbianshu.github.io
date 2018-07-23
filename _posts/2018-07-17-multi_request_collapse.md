@@ -96,13 +96,132 @@ hystrix collapser 的配置需要在 `@HystrixCollapser` 注解上使用，主�
 
 ## BatchCollapser
 ---
-由于业务需求，我们并不太关心被合并请求的返回值，而且觉得 hystrix 保持那么多的 Future 并没有必要，想自己实现一个简单的请求合并器，业务线程简单地将请求放到一个容器里，请求数累积到一定量或延迟了一定的时间，就取出容器内的数据统一发送给下游系统。
+#### 设计
+由于业务需求，我们并不太关心被合并请求的返回值，而且觉得 hystrix 保持那么多的 Future 并没有必要，于是自己实现了一个简单的请求合并器，业务线程简单地将请求放到一个容器里，请求数累积到一定量或延迟了一定的时间，就取出容器内的数据统一发送给下游系统。
+
+设计思想跟 hystrix 类似，合并器有一个字段作为存储请求的容器，且设置一个 timer 线程定时消费容器内的请求，业务线程将请求参数提交到合并 器的容器内。不同之处在于，业务线程将请求提交给容器后立即同步返回成功，不必管请求的消费结果，这样便实现了时间维度上的合并触发。
+
+另外，我还添加了另外一个维度的触发条件，每次将请求参数添加到容器后都会检验一下容器内请求的数量，如果数量达到一定的阈值，将在业务线程内合并执行一次。
+
+由于有两个维度会触发合并，就不可避免会遇到线程安全问题。为了保证容器内的请求不会被多个线程重复消费或都漏掉，我需要一个容器能满足以下条件：
+
+- 是一种 Collection，类似于 ArrayList 或 Queue，可以存重复元素且有顺序;
+- 在多线程环境中能安全地将里面的数据全取出来进行消费，而不用自己实现锁。
+
+java.util.concurrent 包内的 LinkedBlockingDeque 刚好符合要求，首先它实现了 BlockingDeque 接口，多线程环境下的存取操作是安全的；此外，它还提供 `drainTo(Collection<? super E> c, int maxElements)` 方法，可以将容器内 maxElements 个元素安全地取出来，放到 Collection c 中。
+
+#### 实现
+以下是具体的代码实现：
+
+```java
+public class BatchCollapser<E> implements InitializingBean {
+     private static final Logger logger = LoggerFactory.getLogger(BatchCollapser.class);
+     private static volatile Map<Class, BatchCollapser> instance = Maps.newConcurrentMap();
+     private static final ScheduledExecutorService SCHEDULE_EXECUTOR = Executors.newScheduledThreadPool(1);
+
+     private volatile LinkedBlockingDeque<E> batchContainer = new LinkedBlockingDeque<>();
+     private Handler<List<E>, Boolean> cleaner;
+     private long interval;
+     private int threshHold;
+
+     private BatchCollapser(Handler<List<E>, Boolean> cleaner, int threshHold, long interval) {
+         this.cleaner = cleaner;
+         this.threshHold = threshHold;
+         this.interval = interval;
+     }
+
+     @Override
+     public void afterPropertiesSet() throws Exception {
+         SCHEDULE_EXECUTOR.scheduleAtFixedRate(() -> {
+             try {
+                 this.clean();
+             } catch (Exception e) {
+                 logger.error("clean container exception", e);
+             }
+         }, 0, interval, TimeUnit.MILLISECONDS);
+     }
+
+     public void submit(E event) {
+         batchContainer.add(event);
+         if (batchContainer.size() >= threshHold) {
+             clean();
+         }
+     }
+
+     private void clean() {
+         List<E> transferList = Lists.newArrayListWithExpectedSize(threshHold);
+         batchContainer.drainTo(transferList, 100);
+         if (CollectionUtils.isEmpty(transferList)) {
+             return;
+         }
+
+         try {
+             cleaner.handle(transferList);
+         } catch (Exception e) {
+             logger.error("batch execute error, transferList:{}", transferList, e);
+         }
+     }
+
+     public static <E> BatchCollapser getInstance(Handler<List<E>, Boolean> cleaner, int threshHold, long interval) {
+         Class jobClass = cleaner.getClass();
+         if (instance.get(jobClass) == null) {
+             synchronized (BatchCollapser.class) {
+                 if (instance.get(jobClass) == null) {
+                     instance.put(jobClass, new BatchCollapser<>(cleaner, threshHold, interval));
+                 }
+             }
+         }
+
+         return instance.get(jobClass);
+     }
+ }
+```
+
+以下代码内需要注意的点：
+
+- 由于合并器的全局性需求，需要将合并器实现为一个单例，另外为了提升它的通用性，内部使用使用 concurrentHashMap 和 double check 实现了一个简单的单例工厂。
+- 为了区分不同用途的合并器，工厂需要传入一个实现了 `Handler` 的实例，通过实例的 class 来对请求进行分组存储。
+- 由于 java.util.Timer 的阻塞特性，一个 Timer 线程在阻塞时不会启动另一个同样的 Timer 线程，所以使用 `ScheduledExecutorService` 定时启动 Timer 线程。
 
 ## ConcurrentHashMultiset
 ---
+#### 设计
 上面介绍的请求合并都是将多个请求一次发送，下游服务器处理时本质上还是多个请求，最好的请求合并是在内存中进行，将请求结果简单合并成一个发送给下游服务器。如我们经常会遇到的需求：元素分值累加或数据统计，我们就可以先在内存中将某一项的分值或数据累加起来，定时请求数据库保存。
+
+Guava 内就提供了这么一种数据结构： `ConcurrentHashMultiset`，它是一种 set 结构，不同于普通的 set 结构，它在存储相同元素时并不会覆盖原有元素，而是给已有元素的 count 值加1，而且它在添加和删除时并不加锁也能保证线程安全，具体实现是通过一个while(true) 循环尝试删除，直到删除够所需要的数量。
+
+ConcurrentHashMultiset 这种排重计数的特性，非常适合数据统计这种元素在短时间内重复率很高的场景，经过排重后的数量计算，可以大大降低下游服务器的压力，即使重复率不高，能用少量的内存空间换取系统可用性的提高，也是很划算的。
+
+#### 实现
+使用 ConcurrentHashMultiset 进行请求合并与使用普通容器在整体结构上并无太大差异，具体类似于：
+
+```java
+        if (ConcurrentHashMultiset.isEmpty()) {
+            return;
+        }
+
+        List<Request> transferList = Lists.newArrayList();
+        ConcurrentHashMultiset.elementSet().forEach(request -> {
+            int count = ConcurrentHashMultiset.count(request);
+            if (count <= 0) {
+                return;
+            }
+
+            transferList.add(count == 1 ? request : new Request(request.getIncrement() * count));
+            ConcurrentHashMultiset.remove(request, count);
+        });
+```
 
 ## 小结
 ---
+至此，最近了解到的请求合并技术就这些了，最后总结一下各个技术适用的场景：
+
+- hystrix collapser: 需要每个请求的结果，并且不在意每个请求的 cost 会增加；
+- BatchCollapser: 不在意请求的结果，需要请求合并能在时间和数量两个维度上触发；
+- ConcurrentHashMultiset：请求重复率很高的统计类场景；
+
+另外，如果选择自己来实现的话，完全可以将 BatchCollapser 和 ConcurrentHashMultiset 结合一下，BatchCollapser 里使用 ConcurrentHashMultiset 作为容器，这样就可以结合两者的优势了。
+
+技术方案没有最好的，适合自己的才是最好的。
 
 {{ site.article.summary}}
