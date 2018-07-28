@@ -16,7 +16,7 @@ comments: true
 <hr />
 <p>&nbsp;</p>
 <p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">长轮询的思想：</span></strong></p>
-<p><img src="/images/819496-20151114110929165-1485612934.jpg" alt="" /></p>
+<p><img src="/images/2015/819496-20151114110929165-1485612934.jpg" alt="" /></p>
 <p>如图：用AJAX发送询问信息，服务器在没有信息要返回的时候进入<strong>无限等待</strong>。由于AJAX<strong>异步</strong>的特性，PHP在服务器端执行等待不会影响到页面的正常处理。一旦服务器查询到返回信息，服务器返回信息，AJAX用回调函数处理这条信息，同时迅<strong>速再次发送</strong>一个请求等待服务器处理。</p>
 <p>与传统轮询相比，长轮询在服务器没的返回信息的时候进入等待，减少了普通轮询服务器无数次的空回复。可以这样认为，长轮询使服务器每次的返回更有目的性，而不是盲目返回。</p>
 <hr />

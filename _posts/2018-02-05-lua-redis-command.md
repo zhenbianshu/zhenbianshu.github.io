@@ -70,7 +70,7 @@ Redis 在 2.6 版本后，启动时会创建 Lua 环境、载入 Lua 库、定�
 3. 创建一个伪客户端，通过这个伪客户端执行 Lua 中的 Redis 命令；
 4. 处理伪客户端的返回值，最终返回给客户端；
 
-<img src="/images/lua_order.png">
+<img src="/images/2018/lua_order.png">
 
 虽然 Lua 脚本使用的是伪客户端，但 Redis 处理它会跟普通客户端一样，也会将执行的 Redis 命令进行 rdb aof 主从复制等操作。
 

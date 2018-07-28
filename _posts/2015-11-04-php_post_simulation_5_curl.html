@@ -122,7 +122,7 @@ curl_close(</span><span style="color: #800080;">$ch</span>);<span style="color: 
 <p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">cURL批处理时内存占用过多的问题</span></strong></p>
 <p>但是，执行大批量的句柄时我们会发现一个很严重的问题，那就是执行时系统CPU占用率几乎100%，几乎是死机状态了。纠其原因，那是因为在$running&gt;0,执行&nbsp;&nbsp;curl_multi_exec($mh,$running)而整个批处理句柄没有全部执行完毕时，系统会不停地执行curl_multi_exec()函数。我们用实验来证明：</p>
 <p>我们在循环中curl_multi_exec($mh,$running)句前加入一个echo&nbsp;"a";的语句。我们的目的是执行50次对百度的访问，然后来看一下结果。</p>
-<p>&nbsp;<img src="/images/819496-20151104125511883-2016503131.png" alt="" /></p>
+<p>&nbsp;<img src="/images/2015/819496-20151104125511883-2016503131.png" alt="" /></p>
 <p>从图中滚动条的大小(滚动条已经最小状态了)可以大概看出输出a的个数，500个也不止，所以我们便可以找到占用CPU的罪魁祸首了。</p>
 <hr />
 <p>&nbsp;</p>
@@ -219,7 +219,7 @@ curl_close(</span><span style="color: #800080;">$ch</span>);<span style="color: 
 
       </span>?&gt;</pre>
 </div>
-<p>我们再次在&nbsp;$mrc&nbsp;=&nbsp;curl_multi_exec($mh,&nbsp;$running)句子前加入echo&nbsp;"a";结果如下图：<img src="/images/819496-20151104130116571-599187256.png" alt="" /></p>
+<p>我们再次在&nbsp;$mrc&nbsp;=&nbsp;curl_multi_exec($mh,&nbsp;$running)句子前加入echo&nbsp;"a";结果如下图：<img src="/images/2015/819496-20151104130116571-599187256.png" alt="" /></p>
 <p>虽然也不止50次，但是比之未优化前，CPU使用率已经大为改观。</p>
 <p>虽然curl函数非常强大，但是我们还是有使用其他函数来发送POST请求的机会，另外也能从更底层了解curl函数，所以本辑也用大很大篇幅在其他函数上。</p>
 <p>OK，本辑结束，写这辑博文的同时，我也学习到了很多。如果您觉得本博文对您有帮助，请您点推荐或关注我，我们继续分享我的笔记总结。如果有什么问题，您可以在下方留言讨论，谢谢阅读。</p>

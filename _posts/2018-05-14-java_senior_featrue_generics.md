@@ -181,7 +181,7 @@ comments: true
 
 我们将一段泛型代码用 `javac` 命令编译成 class 文件后，再使用 `javap` 命令查看其字节码信息：
 
-![](https://ws4.sinaimg.cn/large/006tKfTcly1fr0i3nya6xj31ha0zotad.jpg)
+![](/images/2018/006tKfTcly1fr0i3nya6xj31ha0zotad.jpg)
 
 我们会发现，类型里的 `T` 被替换成了 Object 类型，而在 `main` 方法里 `getField` 字段时，进行了类型转换(`checkcast`)，如此，我们可以看出来 Java 的泛型实现了，一段泛型代码的编译运行过程如下：
 
@@ -235,7 +235,7 @@ Generics generics = genericsList.get(0);
 
 我将以上步骤整理了一个流程图，按照这个图，我们可以快速得出能不能用泛型，怎么用泛型。
 
-![](https://ws2.sinaimg.cn/large/006tKfTcly1fr8n67hjsuj30gy0uu3za.jpg)
+![](/images/2018/006tKfTcly1fr8n67hjsuj30gy0uu3za.jpg)
 
 ## 小结
 ---

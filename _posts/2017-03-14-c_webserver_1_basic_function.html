@@ -15,7 +15,7 @@ comments: true
 <h1 id="toc_1">服务器架构</h1>
 <h3 id="toc_2">目标架构</h3>
 <p>以 nginx 的思想来考虑本服务器架构，初步考虑如下图：</p>
-<p><img src="/images/819496-20170314203009635-315885048.png" alt="" /></p>
+<p><img src="/images/2017/819496-20170314203009635-315885048.png" alt="" /></p>
 <p>当然 php 进程也可以替换为其他的脚本语言，可以更改源码中的 command 变量实现。</p>
 <p>服务器有一个 master 进程，其有多个子进程为 worker 进程，master 进程受理客户端的请求，然后分发给 worker 进程，worker 进程处理 http 头信息后将参数传递给 php 进程处理后，将结果返回到上层，再响应给客户端。</p>
 <p>也考虑过使用 php-fpm 的 worker 进程池方式，那样的话 php-fpm 进程也要仿写了，目前还不熟悉其内部构造，如果可以简单化，自然向其靠拢。目前对 PHP 的 SAPI 接口不熟，了解一下再考虑。</p>
@@ -35,7 +35,7 @@ comments: true
 <h1 id="toc_4">功能实现</h1>
 <h3 id="toc_5">socket系列方法</h3>
 <p>在介绍函数之间先用一张图来介绍一次 http 请求中客户端与服务器之间的交互：</p>
-<p><img src="/images/819496-20170314203039338-1412939276.png" alt="" /></p>
+<p><img src="/images/2017/819496-20170314203039338-1412939276.png" alt="" /></p>
 <p>如图：服务器创建要进行：</p>
 <ol>
     <li>调用 socket() 创建一个连接；<code>int socket(int domain, int type, int protocol);</code></li>

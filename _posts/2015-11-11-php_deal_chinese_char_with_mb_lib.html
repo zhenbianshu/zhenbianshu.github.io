@@ -30,13 +30,13 @@ comments: true
   <li>如果你什么都没加，就在遇到不能替换成UTF-8的字符时，替换会被中断。</li>
 </ul>
 <p>但是，我在用这个函数处理时，结果却是这样：</p>
-<p><img src="/images/819496-20151111083344462-196924166.png" alt="" /></p>
+<p><img src="/images/2015/819496-20151111083344462-196924166.png" alt="" /></p>
 <p>意思是iconv()函数能处理的最大字符数只有64，一般的文件名大小，而我的文件内容很显然不止64个字符。</p>
 <p>没有办法，我只好再次各种翻找别的函数。</p>
 <hr />
 <p>&nbsp;</p>
 <p>直到我发现了mb_string函数库，这个函数库一般都在PHP环境里集成，我们可以在phpinfo()里找到它。</p>
-<p><img src="/images/819496-20151111083727619-318189619.png" alt="" /></p>
+<p><img src="/images/2015/819496-20151111083727619-318189619.png" alt="" /></p>
 <p>mb_string函数里有一个<span style="color: #ff0000;"><strong>mb_convert_encoding()</strong></span>函数，可以将一个字符串的编码改变，其函数原型如下：</p>
 <blockquote>
   <p>string&nbsp;mb_convert_encoding&nbsp;(&nbsp;string&nbsp;$str&nbsp;,&nbsp;string&nbsp;$to_encoding&nbsp;[,&nbsp;mixed&nbsp;$from_encoding&nbsp;]&nbsp;)</p>

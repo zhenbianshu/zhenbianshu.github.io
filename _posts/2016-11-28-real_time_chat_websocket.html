@@ -10,7 +10,7 @@ comments: true
 <p>以前写过一篇文章讲述如何使用ajax长轮询实现网页实时聊天，见链接： <a href="../../2015/11/real_time_chat_long_polling.html">网页实时聊天之js和jQuery实现ajax长轮询</a> ，但是轮询和服务器的 pending 都是无谓的消耗，websocket 才是新的趋势。</p>
 <p>最近艰难地&ldquo;挤&rdquo;出了一点时间，完善了很早之前做的 websocket &ldquo;请求-原样返回&rdquo;服务器，用js完善了下客户端功能，把过程和思路分享给大家，顺便也普及一下 websocket 相关的知识，当然现在讨论 websocket 的文章也特别多，有些理论性的东西我也就略过了，给出参考文章供大家选择阅读。</p>
 <p>正文开始前，先贴一张聊天室的效果图（请不要在意CSS渣的页面）：</p>
-<p><img src="/images/819496-20161128203834677-823596906.png" alt="" /></p>
+<p><img src="/images/2016/819496-20161128203834677-823596906.png" alt="" /></p>
 <p>然后当然是源码： <span style="color: #ff0000; font-size: 18px;"><a href="https://github.com/zhenbianshu/websocket"><span style="color: #ff0000;">我是源码链接 - github - 枕边书</span></a></span></p>
 <hr />
 <h1 id="toc_1">websocket</h1>
@@ -21,7 +21,7 @@ comments: true
 <p>握手成功后，websocket 就使用自己的协议规定的方式进行通讯，跟 http 就没有关系了。</p>
 <h3 id="toc_4">握手</h3>
 <p>以下是一个我自己的浏览器发送的典型的握手 http 头：&nbsp;</p>
-<p><img src="/images/819496-20161128203922693-450969039.png" alt="" /></p>
+<p><img src="/images/2016/819496-20161128203922693-450969039.png" alt="" /></p>
 <p>服务器收到握手请求后，提取出请求头中的 &ldquo;Sec-WebSocket-Key&rdquo; 字段，追回一个固定的字符串 &lsquo;258EAFA5-E914-47DA-95CA-C5AB0DC85B11&rsquo;， 然后进行 sha1 加密，最后转换为 base64 编码，作为 key 以 &ldquo;Sec-WebSocket-Accept&rdquo; 字段返回给客户端，客户端匹配此 key 后，便建立了连接，完成了握手；</p>
 <h3 id="toc_5">数据传输</h3>
 <p>websocket 有自己规定的数据传输格式，称为 帧（Frame），下图是一个数据帧的结构，其中单位为bit：</p>

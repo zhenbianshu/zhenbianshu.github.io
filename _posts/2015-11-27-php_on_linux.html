@@ -16,7 +16,7 @@ comments: true
 <p>然后要准备一台linux机器，虚拟机是最好的选择了，它便于安装，随开随用。</p>
 <p>虚拟机管理我推荐VM&nbsp;ware&nbsp;station，安装管理都方便，而且功能强大。用过小巧的virtual&nbsp;box，在win7下安装要改theme主题文件，辛苦装好的环境因为未知原因(兼容问题排除后，猜测是BIOS设置的问题，可参考)打不开虚拟机而放弃后，终于选择了VM，VM下安装linux的教程网上到处是，还有全程配图版。</p>
 <p>说一下要注意的地方吧：虚拟机配置选择&ldquo;<span style="color: #ff0000;"><strong>桥接模式</strong></span>&rdquo;，这样，虚拟机和主机就在同一个IP段下，可以很轻松地互相访问，VM下如图:</p>
-<p><img src="/images/819496-20151127083017218-1918193290.png" alt="" /></p>
+<p><img src="/images/2015/819496-20151127083017218-1918193290.png" alt="" /></p>
 <p>然后是我们经常要遇到的问题网络配置、和虚拟之间的交互、yum配置。</p>
 <hr />
 <p>&nbsp;</p>
@@ -55,12 +55,12 @@ GATEWAY</span>=<span style="color: #800080;">192.168</span>.<span style="color: 
 <p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">主机环境下操作虚拟机</span></strong></p>
 <p>配置好之后，便可以用工具来解决虚拟机和主机之间切换复制信息不便的问题了，这里我使用<strong><span style="color: #ff0000;">Secure&nbsp;CRT</span></strong>来进行主机与虚拟机之间的连接。</p>
 <p>安装打开之后，点击quick connect按钮新增一个连接操作，如下图：</p>
-<p>&nbsp;<img src="/images/819496-20151127083452452-1080903006.png" alt="" /></p>
+<p>&nbsp;<img src="/images/2015/819496-20151127083452452-1080903006.png" alt="" /></p>
 <p>然后输入用户密码，保存。</p>
 <p>还要注意使用Secure&nbsp;CRT时的编码问题，默认情况下，虚拟机的中文会显示乱码&nbsp;，需要以下配置：</p>
-<p><img src="/images/819496-20151127083533327-2025402274.png" alt="" /></p>
+<p><img src="/images/2015/819496-20151127083533327-2025402274.png" alt="" /></p>
 <p>然后让虚拟机进入后台运行状态，在VM界面，点击关闭虚拟机窗口，会弹出如下菜单。</p>
-<p>&nbsp;<img src="/images/819496-20151127083549452-1331392541.png" alt="" /></p>
+<p>&nbsp;<img src="/images/2015/819496-20151127083549452-1331392541.png" alt="" /></p>
 <p>选择<strong><span style="color: #ff0000;">后台运行</span></strong>，这样就可以不用管虚拟机窗口，尽情地用Secure CRT在window下操作虚拟机了。</p>
 <hr />
 <p>&nbsp;</p>

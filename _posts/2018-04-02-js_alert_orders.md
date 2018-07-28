@@ -31,7 +31,7 @@ comments: true
 此时，还有更诡异的情况，我们给某一个 div 里赋值后，立刻 alert 此 div 里的内容，会发现 alert 显示正确的内容，而 div 里的内容却没有更新，并且会一直阻塞到我们点击确定。
 
 如图：
-<img src="/images/js_alert.png">
+<img src="/images/2018/js_alert.png">
 
 alert、prompt、confirm 三个函数都类似，接下来我们就用最简单的 alert 来说。
 
