@@ -1,0 +1,133 @@
+---
+layout: post
+title: "用C写一个web服务器（三） Linux下用GCC进行项目编译"
+date: 2017-04-18 18:00:08 +0800
+comments: true
+---
+
+<h1 id="toc_0">前言</h1>
+<p>离职前对做过的支付系统进行了一番#总结，继续完善我的C服务器。</p>
+<p>本想着接下来大概实现一下 CGI 协议，但是实现过程中被一个问题卡住了：</p>
+<blockquote>
+    <p>C进程与php进程的交互数据类型问题：</p>
+    <p>在 C 进程中我准备将服务器处理后的请求数据存储在一个结构体内，然后将此结构体中的信息传给 PHP，而 PHP 进程内也会有一个全局数组与之对应，可是众所周之，结构体是 C 进程内的内存数据，是无法直接传给 PHP 使用的。</p>
+</blockquote>
+<p>这时候我们也需要一种&ldquo;协议&rdquo;来解决进程数据类型的异构性。当然这个解决方案确定起来还是很简单的，无非是对C结构体进行序列化，使用xml，json，protobuf（没用过）之一，花费时间多的地方在实现过程。 原来想自己造个轮子，实现一下json类型的编解码，觉得有些偏离了主题了，于是考虑使用一个开源库<code>cJSON</code>;</p>
+<p>可是自己没有过 C 大型项目的开发经验，写的都是小 demo，<code>gcc -o name source.c</code> 足以解决问题了，没有过编译多个文件、组织项目的经验，下载到源码后一脸懵逼，搜索到的编译资料都是一些较为零散的内容，不成体系，不过在自己的多次尝试下终于成功地将 cJSON 引入到项目中了，这里稍做一下总结。</p>
+<p>绕了好久，终于来到了本篇文章的主题：项目编译，主要介绍一些用 GCC 在 linux 下项目编译链接的步骤。</p>
+<p>另外，我只是测试了方案可行，还没动手改，对方案优劣情况的判断还不足，望有过类似经验的同学给点意见什么的。</p>
+<hr />
+<h1 id="toc_1">编译步骤</h1>
+<p>先说一下一个C源文件的编译一般步骤：</p>
+<ol>
+    <li>
+        <p>预处理(preprocess)：主要是在代码层面的处理，包括文件的引入，展开宏定义，删除注释，添加行号等，生成的文件以<code>.i</code>结尾。</p>
+        <p><code>gcc -E test.c -o test.i</code></p>
+    </li>
+    <li>
+        <p>编译(compilation)：编译是在代码语法层面的处理，生成对应的汇编语言代码，生成以<code>.s</code>为后缀的汇编语言文件；</p>
+        <p><code>gcc -S test.i -o test.s</code></p>
+    </li>
+    <li>
+        <p>汇编(Assembly)：将汇编语言代码生成可执行的机器码，生成以<code>.o</code>为后缀的目标文件。</p>
+        <p><code>gcc -c test.s -o test.o</code></p>
+    </li>
+    <li>
+        <p>链接(Linking)：将各个<code>.o</code>目标文件连接起来，并解决库依赖，生成无后缀的可直接执行文件。</p>
+        <p><code>gcc -o test test.o</code></p>
+    </li>
+</ol>
+<p>如果我们直接使用后面的命令，那么前面的步骤也会自动执行。如我们常使用的 <code>gcc -o</code> 实际上是一次性完成了所有的步骤的。</p>
+<p>以上的中间文件，大家可以使用文本查看工具来查看其中内容来验证其功能。</p>
+<hr />
+<h1 id="toc_2">静态库和动态库</h1>
+<p>库文件有动态和静态之分，他们的命名规范为 <code>lib库名.后缀</code>，在链接目标文件和库时，使用 <code>-l 库名</code>（空格可省略）选项，也可以添加<code>-L /path</code>来规定优先搜索库文件的目录。</p>
+<p>例如：C中的数学函数库<code>math.h</code>的动态库文件名为<code>libm.so</code>，那么我们编译连接文件时就需要添加<code>-lm</code>的选项。如果要指定库文件路径为<code>/usr/lib64/libm.so</code>，那么可添加<code>-L /usr/lib64</code>来指定库文件优先查找目录。</p>
+<p>另外静态和动态库文件搜索目录顺序不一样，下面分别详细介绍：</p>
+<h1 id="toc_3">静态库</h1>
+<p>静态库文件一般是以<code>.a</code>为后缀的库文件，它在编译连接时会将库文件的内容全部添加到可执行文件中，在编译连接完成后，静态库文件便不再影响可执行文件。</p>
+<p>它的优点是简单粗暴，但如果库文件内部有改动的话需要重新对所有引用此库文件的可执行文件重新编译。</p>
+<p>一般编译步骤如下：</p>
+<div>
+<pre><code class="language-none">gcc -c static.c -o static.o // 编译静态库文件的源文件
+    ar -r static.a static.o // 生成静态库文件
+    gcc -o main -lstatic // 连接静态库文件生成可执行文件</code></pre>
+</div>
+<p>编译连接时，静态库文件搜索目录顺序为：</p>
+<ol>
+    <li>编译连接时 -L 参数指定的目录；</li>
+    <li>环境变量目录 <code>LIBRARY_PATH</code>；</li>
+    <li>固定目录 <code>/lib、/usr/lib、/usr/local/lib</code>等；</li>
+</ol>
+<h1 id="toc_4">动态库</h1>
+<p>动态库文件一般以<code>.so</code>结尾，它在编译连接时只把动态库的文件添加到可执行文件，只在程序运行时才加载库文件。这种方式的优点是非常灵活，如果动态库文件内部有变动，那么只需重要重新编译库文件即可。</p>
+<p>它的一般编译步骤如下：</p>
+<div>
+<pre><code class="language-none">gcc -c dynamic.c -fpic -o dynamic.o // 编译动态库文件的源文件 -fpic 表示编译为位置独立的代码，使之可以被放在可执行文件内存中的任何地方
+    gcc -shared dynamic.o -o dynamic.so // 生成动态库文件
+    gcc -o main -L . -ldynamic // 连接当前文件夹下的动态库文件
+</code></pre>
+</div>
+<p>编译连接时，动态库文件搜索目录顺序为：</p>
+<ol>
+    <li>编译连接时 -L 参数指定目录；</li>
+    <li>环境变量目录 <code>LD_LIBRARY_PATH</code>；</li>
+    <li>配置文件<code>/etc/ld.so.conf</code>中配置的目录</li>
+    <li>固定目录 <code>/lib、/usr/lib</code>等。</li>
+</ol><hr />
+<h1 id="toc_5">CMakeLists</h1>
+<p>写到这里还不是结尾，我们要考虑如果文件非常多怎么办，难道每一次都要输入n多个源文件名吗？如果软件完成后，用户使用时可不想记住这些复杂的命令和文件。</p>
+<p>自动化才是目标，我们考虑使用自动化编译工具 cmake，那么接下来我们就要编写适合项目文件的编译配置文件 CMakeLists。</p>
+<p>CMakeLists 是一个 txt 文件，它就像是项目的编译指南，是给用 cmake 工具用的。其语法类似于 shell，但内置了许多函数，这里我们介绍几个简单的语法，编写一个简单的 <code>CMakeLists.txt</code>。</p>
+<p>当前文件结构：</p>
+<div>
+<pre><code class="language-none">|__ CMakeLists.txt
+    |__ test.c
+    |__ cJSON.c
+    |__ include
+    |   |__ cJSON.h
+    |__ lib</code></pre>
+</div>
+<p>下面是一个动态库的编译CmakeList，将解释放在注释中。</p>
+<div>
+<pre><code class="language-none">PROJECT(test)  # 项目名称
+    cmake_minimum_required(VERSION 2.8) # 选择一个cmake版本
+
+    SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib) # 设定产生库的目录
+    SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin) # 设定产生的可执行文件的目录
+
+    ADD_EXECUTABLE(test test.c) # 这里要先声明产生的可执行文件，以便后面连接
+
+    SET(cJSON cJSON.c)  # 设置文件变量
+    ADD_LIBRARY(cJSON SHARED ${cJSON}) # 此语句用文件变量生成一个动态链接库
+    TARGET_LINK_LIBRARIES(test cJSON) # 连接可执行文件与动态链接库
+
+    FIND_LIBRARY(MATH_LIB libm.so /usr/lib64)  # 在/usr/lib64文件夹下找libm.so（cJSON需要）
+    IF(MATH_LIB)
+        TARGET_LINK_LIBRARIES(test ${MATH_LIB}) # 找到之后连接上
+    ENDIF()
+
+    MESSAGE("cmake complete, use make to compile!") # 在命令行输出提示语句</code></pre>
+</div>
+<p>搞了一个多小时，终于写出来了一个能用的 CMakeLists 文件。运行 <code>cmake . &amp;&amp; make</code>完成项目的构建。</p>
+<p>此时的目录结构为（略过了 cmake 产生的临时文件）:</p>
+<div>
+<pre><code class="language-none">|__ CMakeLists.txt
+    |__ test.c
+    |__ cJSON.c
+    |__ include
+    |   |__ cJSON.h
+    |__ lib
+    |   |__ libcJSON.so
+    |__ bin
+        |__ test</code></pre>
+</div>
+<hr />
+<h1 id="toc_6">小结</h1>
+<p>本文严重地说明了光会写代码没什么卵用，环境的搭建/类库的使用也是必备技能，毕竟不能每个轮子都自己造。</p>
+<p>如果你也是 C 新手的话，本文可以让你大概了解一下编译步骤等，不至于跟我一开始一样一头雾水。如果要深入学习的话，文章的关键词和下面的参考文件也能有些帮助。</p>
+<p>如果您觉得本文对您有帮助，可以点击下面的 <strong><em>推荐</em></strong> 支持一下我。博客一直在更新，欢迎 <strong><em>关注</em></strong> 。</p>
+<p>参考文件（精挑细选）：</p>
+<p><a href="https://www.tianmaying.com/tutorial/GCC">GCC工作过程以及动态库静态库链接</a></p>
+<p><a href="http://blog.sina.com.cn/s/blog_690c46500100kxhd.html">Linux动态库文件搜索路径</a></p>
+<p><a href="http://blog.csdn.net/wzzfeitian/article/details/40963457"> cmake使用示例与整理总结</a></p>

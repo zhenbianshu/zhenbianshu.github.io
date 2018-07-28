@@ -1,0 +1,90 @@
+---
+layout: post
+title: "Linux“体检”指标"
+date: 2017-10-17 18:00:08 +0800
+comments: true
+---
+
+<p><span style="font-size: 25.5px; font-weight: bold; text-align: left;">前言</span></p>
+<p>在&ldquo;求佛保佑服务器不宕机&rdquo;、&ldquo;杀程序员祭天&rdquo;的环境下，程序员每天可谓是战战兢兢，接到电话和短信都吓得瑟瑟发抖，为了我们的安全，及时发现服务器运行问题已不仅仅是运维的问题了。今天总结一下常见的服务器监控指标，希望各位开发人员都搞一个脚本运行着以保障自己的生命安全。</p>
+<p>文章经常被人爬，而且还不注明原地址，我在这里的更新和纠错没法同步，这里注明一下原文地址：http://www.cnblogs.com/zhenbianshu/p/7683496.html&nbsp;</p>
+<hr />
+<h1 id="toc_1">获取服务器信息</h1>
+<p>多台机器同时需要监控时，每台机器都需要运行一个监控程序，我们首先要获取服务器的信息以分辨机器，发生问题时，也可以评估问题的严重性。</p>
+<h3 id="toc_2">获取IP</h3>
+<p>获取内网IP：</p>
+<p>通过ifconfig命令获取全部的网络信息，并排除掉本地host和ipv6信息。</p>
+<p><code>/sbin/ifconfig | grep inet | grep -v '127.0.0.1' | grep -v inet6 | awk '{print $2}' | tr -d "addr:"</code></p>
+<p>注意这里要使用<code>ifconfig</code>的绝对路径，因为如果监控脚本运行在 crontab 的话，执行时是不会带有环境信息的。</p>
+<p>获取外网IP：</p>
+<p>外网的IP我们可以通过请求别的网站来回显，有一些网站提供此服务，如 <code>ipecho.net/plain</code> 或者我自己懒得搭建的网站：<code>alwayscoding.net</code>。</p>
+<p>命令如下 <code>curl alwayscoding.net</code></p>
+<h3 id="toc_3">获取系统信息</h3>
+<p>获取系统信息建议使用 <code>lsb_release -a</code> 方法：</p>
+<div>
+<pre class="line-numbers"><code class="language-none">lsb_release -a
+LSB Version:    :base-4.0-amd64:base-4.0-noarch:core-4.0-amd64:core-4.0-noarch
+Distributor ID: CentOS
+Description:    CentOS release 6.5 (Final)
+Release:    6.5
+Codename:   Final</code></pre>
+</div>
+<p>信息比较丰富，可以截取字符串中需要的部分；</p>
+<hr />
+<h1 id="toc_4">CPU</h1>
+<p>CPU 负载是我们要监控的首要指标，我们常说的系统负载指的就是它，它是指<code>一段时间内CPU处理进程数占 CPU 能处理最大进程数的比例</code>，即一个 CPU 的最大负载是 <code>1.0</code>，这种情况 CPU 正好能将所有进程执行完，超出这个限制，系统会进入 over load 超载状态，就会有进程需要等待其他进程执行结束。我们一般认为CPU负载在 <code>0.6</code>以下是健康状态。</p>
+<p>在终端上查看系统负载通常使用 <code>top</code> 命令，但它是交互型的，且数据较多较杂，不利于写监控脚本，我们一般使用 <code>uptime</code> 通过其 <code>average load</code> 字段获取最近 1分钟、5分钟、15分钟的平均负载。</p>
+<div>
+<pre class="line-numbers"><code class="language-none">uptime
+16:03:30 up 130 days, 23:33,  1 user,  load average: 4.62, 4.97, 5.08</code></pre>
+</div>
+<p>此时系统平均负载约为 5，不是系统已经超载，也没有显示错误，这是因为在考虑负载时还要考虑 CPU 的核心数，多核 CPU 同时能处理的进程数与其核数成正比，其最大负载不是 1，而是其 CPU 核心数 N。</p>
+<p>我们使用 <code>nproc</code> 可以查看系统 CPU 核心数，我正在使用的这台机器核心数是 16，所以其最大负载是16，平均负载是 5/16 = 0.32 ， CPU 处于健康状态。</p>
+<hr />
+<h1 id="toc_5">内存</h1>
+<p>内存是我们要监控的另外一项核心指标，内存占用率太高，无疑会导致进程无法正常分配内存执行。</p>
+<p>我们也可以通过 top 命令查看内存占用，但监控中更常用 <code>free</code> 命令：</p>
+<div>
+<pre class="line-numbers"><code class="language-none">free -m
+             total       used       free     shared    buffers     cached
+Mem:         32108      18262      13846          0        487      11544
+-/+ buffers/cache:       6230      25878
+Swap:            0          0          0</code></pre>
+</div>
+<p>我们首先来看 Mem 这一行，共 32108M 内存，已使用 18262M，剩余 13846，那么内存的使用率就是 18262/32108*100% = 56.88%。那么，后面的shared、buffers、cached 又是什么意思呢？</p>
+<p>其实在 linux 中，内存的分配也是懒惰原则，在内存分配给一个进程，进程执行完毕后 linux 是不会立即清理内存的，而是把这一部分内存当作缓存存储起来，如果此进程再启动就不必再重新加载了；如果可用内存使用完了，则将这一部分缓存清空，重新利用。这样来看 <code>used 里的 buffers 和 cached 部分是随时可被重用</code>的，不能算作被占用。而 shared 是进程共享内存部分，会作为被占用部分，但一般较少使用，与此相关的内容，可以看文末的参考文章。</p>
+<p>真实数据是第三行的去除 buffers 和 cache 的部分，即真正的内存使用率是 <code>6230/(6230+25878)*100% = 19.4%</code>。</p>
+<p>而第四行的 swap 是用来临时存储内存 buffers 和 cache 的，正常情况虽然能加快进程的重启，但物理内存较少的情况下，会引起 swap 的频繁读写，增加服务器的 IO 压力，用与不用视情况而定。</p>
+<hr />
+<h1 id="toc_6">网络</h1>
+<p>网络在 linux 作为 web 服务器时也是一项很重要的指标，相关命令有很多，但各有所长，我们一般监控以下状态：</p>
+<h3 id="toc_7">使用netstat查看监听端口。</h3>
+<p><code>netstat -an | grep LISTEN | grep tcp | grep 80</code> 查看是否有进程正在监控80端口。</p>
+<h3 id="toc_8">使用ping监控网络连接</h3>
+<p>使用 <code>ping</code> 命令可以查看网络是否连接，使用 -c 选项来控制请求次数，使用 -w 选项来控制超时时间（单位：毫秒），最后利用 <code>&amp;&amp;</code> 符号的 <code>短路</code> 特性来控制结果输出:</p>
+<p><code>ping -w 100 -c 1 weibo.com &amp;&gt;/dev/null &amp;&amp; echo "connected"</code></p>
+<hr />
+<h1 id="toc_9">硬盘</h1>
+<p>硬盘不是特别重要的监控指标，但在硬盘满的时候写文件失败也会影响进程的正常执行。</p>
+<p>我们使用 <code>df</code> 命令来查看磁盘的使用状态，-h 会以易读格式输出：</p>
+<div>
+<pre class="line-numbers"><code class="language-none">df -h
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1        40G  6.0G   32G  16% /
+tmpfs            16G     0   16G   0% /dev/shm
+/dev/vdb1       296G   16G  265G   6% /data0</code></pre>
+</div>
+<p>我们可以使用 grep 命令找到想要查询的挂载节点，再使用 awk 命令获取结果字段。</p>
+<p>另外使用 <code>du [-h] /path/to/dir [--max-depth=n]</code> 可以查看某目录的大小，注意使用 <code>--max-depth=n</code>控制遍历深度。</p>
+<hr />
+<h1 id="toc_10">运行/其他</h1>
+<p>其他的监控状态主要包括进程错误日志监控，请求数监控，进程存在状态监控等，这些可以用到一些基本命令了，如 <code>ps</code>等。</p>
+<p>更详细的信息就需要使用进程日志了，使用 <code>grep 、awk</code> 等命令来分析日志来获取更详细的信息。</p>
+<hr />
+<h1 id="toc_11">总结</h1>
+<p>最后是监控结果的统计了，可以使用一般的&ldquo;推&rdquo;和&ldquo;拉&rdquo;方式，建议各机器把结果推到一台机器上进行统计和报警。也可以使用 <code>rsync</code> 方式从各服务器拉取，报警方式像企业微信、短信、邮件等就按要需配置了。</p>
+<p>最后，系统监控是个重要且需要持续关注的事情，祝大家的服务器永不宕机。</p>
+<p>关于本文有什么问题可以在下面留言交流，如果您觉得本文对您有帮助，可以点击下面的 <strong><code>推荐</code></strong> 支持一下我，博客一直在更新，欢迎 <strong><code>关注</code></strong> 。</p>
+<p>参考：</p>
+<p><a href="http://www.ruanyifeng.com/blog/2011/07/linux_load_average_explained.html">理解Linux系统负荷-阮一峰</a></p>
+<p><a href="http://liwei.life/2016/04/26/linux%E5%86%85%E5%AD%98%E4%B8%AD%E7%9A%84cache%E7%9C%9F%E7%9A%84%E8%83%BD%E8%A2%AB%E5%9B%9E%E6%94%B6%E4%B9%88%EF%BC%9F/">linux内存中的cache真的能被回收么？</a></p>

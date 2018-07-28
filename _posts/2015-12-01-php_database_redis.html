@@ -1,0 +1,161 @@
+---
+layout: post
+title: "PHP中的数据库三、redis"
+date: 2015-12-01 18:00:08 +0800
+comments: true
+---
+
+<p>memcache虽然好用，解决了数据库遇到高并发时的IO问题，但还有很多问题丞待解决：</p>
+<p>1、数据持久性问题，memcache用内存进行存储，一旦memcache服务器宕机，那么所存储的数据全部丢失。</p>
+<p>2、memcache存储的数据类型单一，只支持key-value型的数据，要存储复杂类型的数据，必然需要PHP脚本的大量逻辑操作。</p>
+<hr />
+<h1>redis基本介绍</h1>
+<p>redis也是一个内存非关系型数据库，它拥有memcache在数据存储上的全部优点，而且在memcache的基础上(memcache的介绍可以看我的上一篇博文：<a href="../11/php_database_memcache.html">PHP中的数据库二、memcache</a></p>
+<ul>
+    <li>增加了数据持久性功能，redis用rdb和aof两种方式实现数据持久性，在服务器突然宕机时也能几乎保留已存的全部数据。</li>
+    <li>增加了string(字符串)、set(集合)、sorted_set(有序集合）、hash(哈希)、list(链表)数据类型，方便了多类型的存储和数据库操作。</li>
+    <li>增加了安全验证(可为服务器设置连接密码)。</li>
+    <li>redis的主从分离等系统更完善(官方开发)。</li>
+    <li>原生支持发布/订阅、队列、缓存等工具。</li>
+</ul>
+<p>当然，相比较memcache，它的数据库操作也较为复杂。</p>
+<hr />
+<h1>redis的应用场景和安装</h1>
+<p>redis除了可以用在memcache能用的地方，它还可以用在：</p>
+<ul>
+    <li>可以用链表来存储数据，读取其最新信息。</li>
+    <li>可以用有序列表存储数据，读取其排行榜数据</li>
+    <li>可以用集合来存储关注/被关注信息。</li>
+</ul>
+<p>在官网(http://redis.io/)下载到它的最新版本，直接解压，因为redis官方已经编译过了，直接进行make / make test ,在make install时可以指定其安装路径。</p>
+<p>安装完成后，将安装包里的redis的conf文件mv到安装目录的bin目录下，它是配置和启动redis所必需的。</p>
+<p>除此，安装目录文件下bin目录里还有如下文件。</p>
+<pre><code>redis-benchmark //性能测试工具 -n xxx 表示发出xxx条命令用来测试
+redis-check-aof //检查aof日志的工具
+redis-check-dump //检查rbd日志的工具
+redis-cli       //客户端
+redis-server    //redis的服务器进程
+redis-sentinel //redis哨兵模式的进程
+</code></pre>
+<p>我们用vim打开redis.conf来简单配置redis服务器。</p>
+<ul>
+    <li>将daemonize 选项改为yes来后台运行</li>
+    <li>database n 设置一个redis服务器里有n个服务器，默认为0-15共16个</li>
+    <li>port n 来设置redis服务器的监听端口</li>
+    <li>设置requirepass yourpassword来设置密码，客户端连接后用auth password来通过验证</li>
+</ul>
+<p>我们使用./redis-server ./redis.conf命令来打开redis服务器。</p>
+<p>使用./redis-cli [-p port]来连接服务器(默认6379)。</p>
+<hr />
+<h1>redis的命令</h1>
+<h3>基本（包括string字符串类型)命令</h3>
+<pre><code>set key value [ex|px n] //设置值[并设置过期时间为n秒/毫秒]
+get key //获取值
+del key //删除值
+incby|decby key n //将key值自增或自减n
+rename key newkey//覆盖原来的
+select n//选择第n个数据库
+ttl key //查询key的过期时间，-1表示永不过期，不存在的为-2
+expire key n //设置key的过期时间为n秒
+type key //获取key的存储类型
+flushdb //清除当前数据库中的值
+shutdown [nosave]//关闭服务器[不存储]
+</code></pre>
+<h3>list(链表)命令</h3>
+<pre><code>lpush/rpush list value1 [value2 value3...] //将value压入链表头/尾
+lpop/rpop list //弹出链表头/尾的值
+llen list //获取链表长度
+</code></pre>
+<h3>set(集合)命令</h3>
+<pre><code>sadd set value //往集合中添加value
+smembers set //查看集合中的全部数据
+srem set value1[value2...]//删除集合中的元素
+sismember set value //判断value是否是集合中的一个元素
+</code></pre>
+<h3>sorted_set(有序集合)命令</h3>
+<pre><code>zadd sorted_set score1 key1 score2 key2 score3 key3...向有序集合中添加key,并定义其score，集合会用score对其排序
+zrange sorted_set a b [withscores]从第a到第b显示有序列表中的值 b为-1时显示全部,[显示各个值的score]
+zrank/zrevrank sorted_set key 正序/倒序显示key在有序集合中的位置
+zrem sorted_set key 删除有序集合中的key
+zcard sorted_set [m n]计算有序集合中[score在m到n之间的]一共有多少个
+</code></pre>
+<h3>hash(哈希类型)命令</h3>
+<pre><code>hset hashset key value 设置hash表key的值为value
+hget hashset key 获取hash表的key值
+hdel hashset key 删除hash表中的一个key
+hlen hashset 获取hash表的长度
+</code></pre>
+<p>redis命令繁多，这里只列了一点简单的，具体命令可以其官网或其中文站http://www.redis.cn/查看翻译文档</p>
+<hr />
+<h1>redis的事务和发布、订阅</h1>
+<p>redis中的事务与mysql的类似，只有语句有些不同。</p>
+<pre><code>                redis               mysql
+开始事务        multi           start transition
+                    事务中的query语句
+执行事务        exec                commit
+回滚事务        discard             roll back
+</code></pre>
+<p>对于并发影响，redis有watch语句控制，被watch语句监测的key值一旦在事务提交前发生变化，则事务自动被取消回滚。</p>
+<pre><code>watch key1 [key2...]
+unwatch 取消所有监测。
+</code></pre>
+<p>redis原生发布和订阅功能，它类似于设计模式中的观察者模式，被订阅对象一旦发布了新的消息，那么所有订阅对象都会收到这条消息。使用方式为：</p>
+<pre><code>subscribe key //订阅某个key,如果这个key发布了新的消息，则会收听到
+public key value//发布消息key，值为value，返回值是收到这个消息的人的个数
+unsubscribe key //取消监听
+psubscribe key1 key2/pattrn //[根据模式]监听多个key
+</code></pre>
+<hr />
+<h1>redis的数据持久化</h1>
+<p>redis通过rdb和aof两种方式实现数据持久化，两种数据持久化方式都会占用CPU资源，拖慢redis的执行效率，一般两种模式配合使用。</p>
+<p>rdb方式的主要原理就是达到某一写入条件后把内存中的所有数据的快照保存一份到磁盘上，数据恢复时用数据快照恢复。</p>
+<p>aof方式是通过将每条redis执行命令记录入文本文件，恢复数据时重复执行记录的命令。</p>
+<h3>rdb方式实现数据持久化</h3>
+<p>用save/bgSave命令可以主动使用rdb方式[后台]存储rdb</p>
+<p>修改redis.conf文件进行配置</p>
+<pre><code>save m n                    //在m秒内有n次修改即进行一次快照，保存点很重要，一般会配置多个条件，满足其中之一就保存
+stop-writes-on-bgsave-error yes //在进行快照的过程中如果出错，则停止写入
+rdbcompression yes          //设置进行数据压缩
+rdbchecksum yes             //导入数据时检查文件是否损坏
+dbfilename xxx.rdb          //导出的文件名
+dir path                    //导出的文件路径
+</code></pre>
+<h3>aof方式实现数据持久化</h3>
+<p>aof持久化的问题在于将每条指令都记录下来，即使是对一个键的反复操作，这样会导致aof文件越来越大，使用aof重写将会大大减小aof文件的体积，因为它是在最后将数据库内数据的状态统一逆化为命令，而不论一个key经过了多少次变化。使用 bgrewrite 命令可手动重写aof文件。</p>
+<p>配置redis.conf文件：</p>
+<pre><code>noapppendfsync-on-rewrite yes       //设置导出rdb时停止写入aof，aof会被写在内存队列里，dump rdb 完成后统一进行写入操作。
+appendfsync everysec                //每秒写入一次
+appendfilename                      //path/filename.aof
+auto-aof-rewrite-percentage 100     //文件大小增长100%时重写
+auto-aof-rewrite-min-size 64m       //文件至少达到64m时重写
+</code></pre>
+<hr />
+<h1>redis的主从复制</h1>
+<p>主从复制时，主从都要以自己的.conf文件来启动服务器。主服务器可以将rdb关闭，以从服务器来产生rdb，加快主服务器的速度。</p>
+<p>从服务器复制一个redis6380.conf文件，设置端口，pid存放文件，只读，主服务器的密码。</p>
+<pre><code>port 6380
+pidfile filename
+slave-read-only yes
+masterauth password
+</code></pre>
+<p>设置完成后，分别用不同的conf文件打开服务器。</p>
+<p>考虑到主服务器宕机的情况，我们用sentinel redis哨兵来监测服务器状态，在主服务器宕机之后做出反应。sentinel是redis集成的，我们只需要将安装包里的sentinel.conf文件拷贝到redis/bin目录下，使用redis-sentinel进程文件来启动服务器即可。</p>
+<pre><code>port 26379                                       //sentinel监听的端口号
+daemonize yes                                    //后台启动进程
+sentinel monitor mymaster 192.168.100.211 6379 2 //设置主进程ip和端口号，并设置两个哨兵发现主服务器长时间无法连接才判定其宕机
+sentinel down-after-milliseconds mymaster 30000  //30000毫秒连接不上判定为无法连接
+sentinel parallel-syncs mymaster 1               //一个主服务器打开时，同时复制的从服务器数，太大的话会造成服务器瞬间拥堵
+sentinel failover-timeout mymaster 900000        //在90000秒内哨兵不再试图恢复原主服务器
+</code></pre>
+<hr />
+<h1>PHP操作redis服务器</h1>
+<p>安装好php的redis扩展后(具体看我的博文<a href="http://www.cnblogs.com/zhenbianshu/p/4999588.html">linux下的PHP</a>)，就可以直接使用redis的类函数库了。</p>
+<p>如下是典型的redis应用。</p>
+<pre><code>$redis=new Redis();                     //实例化一个Redis对象
+$redis-&gt;connect('host',port);           //连接redis服务器
+$redis-&gt;auth('password');               //用密码认证
+$redis-&gt;set($key,$value[,$expire_time]);//设置一个值
+$content=$redis-&gt;get($key);             //获取值
+</code></pre>
+<p>具体函数使用可以看官方的文档：https://github.com/phpredis/phpredis</p>
+<p>如果您觉得本博文对您有帮助，您可以推荐或关注我，如果您有什么问题，可以在下方留言讨论，谢谢。</p>

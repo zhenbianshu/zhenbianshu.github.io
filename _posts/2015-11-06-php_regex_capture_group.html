@@ -1,0 +1,133 @@
+---
+layout: post
+title: "PHP正则中的捕获组与非捕获组"
+date: 2015-11-06 18:00:08 +0800
+comments: true
+---
+
+<p>今天遇到一个正则匹配的问题，忽然翻到有捕获组的概念，手册上也是一略而过，百度时无意翻到C#和Java中有对正则捕获组的特殊用法，搜索关键词有PHP时竟然没有相关内容，自己试了一下，发现在PHP中也是可行的，于是总结一下，分享的同时也希望有大神和细心的学习者找到我理解中出现的问题。</p>
+<hr />
+<p>&nbsp;</p>
+<p><span style="font-family: 'Microsoft YaHei';"><strong><span style="font-size: 18pt;">什么是捕获组</span></strong></span></p>
+<p>我们先看一下PHP的正则匹配函数</p>
+<blockquote>
+    <p>int&nbsp;preg_match&nbsp;(&nbsp;string&nbsp;$pattern&nbsp;,&nbsp;string&nbsp;$subject&nbsp;[,&nbsp;array&nbsp;&amp;$matches&nbsp;[,&nbsp;int&nbsp;$flags&nbsp;=&nbsp;0&nbsp;[,&nbsp;int&nbsp;$offset&nbsp;=&nbsp;0&nbsp;]]]&nbsp;)</p>
+</blockquote>
+<p>前面两项是我们常用的，$pattern是正则匹配模式，$string是要匹配的字符串。</p>
+<p>array&nbsp;&amp;$match,它是一个数组，&amp;表示匹配出来的结果会被写入$match中。</p>
+<p>int $flags&nbsp;如果传递了这个标记,&nbsp;对于每一个出现的匹配返回时会附加字符串偏移量(相对于目标字符串的)。</p>
+<p>int $offset&nbsp;用于指定从目标字符串的某个未知开始搜索(单位是字节)。</p>
+<p>我们主要看一下$match的值里会有什么：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$mode</span> = '/a=(\d+)b=(\d+)c=(\d+)/'<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$str</span>='**a=4b=98c=56**'<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$res</span>=<span style="color: #008080;">preg_match</span>(<span style="color: #800080;">$mode</span>,<span style="color: #800080;">$str</span>,<span style="color: #800080;">$match</span><span style="color: #000000;">);
+
+</span><span style="color: #008080;">var_dump</span>(<span style="color: #800080;">$match</span>);</pre>
+</div>
+<p>结果如下：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">array</span> (size=4<span style="color: #000000;">)
+
+  </span>0 =&gt; <span style="color: #0000ff;">string</span> 'a=4b=98c=56' (length=11<span style="color: #000000;">)
+
+  </span>1 =&gt; <span style="color: #0000ff;">string</span> '4' (length=1<span style="color: #000000;">)
+
+  </span>2 =&gt; <span style="color: #0000ff;">string</span> '98' (length=2<span style="color: #000000;">)
+
+  </span>3 =&gt; <span style="color: #0000ff;">string</span> '56' (length=2)</pre>
+</div>
+<p>现在我们知道了什么是捕获组，捕获组是正则表达示中以()括起来的部分，每一对()是一个捕获组。</p>
+<p>PHP会为它编号，从1开始。至于为什么会从1开始，那是因为PHP把匹配到的完整字符串编号为0。</p>
+<p>如果有多个括号或嵌套括号，按<span style="color: #ff0000;"><strong>左边括号出现的顺序</strong></span>来进行编号，如图：</p>
+<p><img src="/images/819496-20151106104131071-2025639233.jpg" alt="" /></p>
+<p>按图中的匹配模式匹配时，捕获组的123号分别是红绿蓝。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">捕获组的忽略与命名</span></strong></p>
+<p>我们还可以阻止PHP为匹配组的编号：在匹配组中模式前加&nbsp;<span style="color: #ff0000;">&nbsp;<strong>?:</strong>&nbsp;</span></p>
+<p><strong>$mode&nbsp;=&nbsp;'/a=(\d+)b=(?:\d+)c=(\d+)/';</strong></p>
+<p>这样，匹配结果就会变成：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">array</span> (size=3<span style="color: #000000;">)
+
+  </span>0 =&gt; <span style="color: #0000ff;">string</span> 'a=4b=98c=56' (length=11<span style="color: #000000;">)
+
+  </span>1 =&gt; <span style="color: #0000ff;">string</span> '4' (length=1<span style="color: #000000;">)
+
+  </span>2 =&gt; <span style="color: #0000ff;">string</span> '56' (length=2)</pre>
+</div>
+<p>当然，我们也可以在括号的内部为它给它独特的名字。</p>
+<blockquote>
+    <p>命名子组可以接受(?&lt;name&gt;),&nbsp;(?'name')&nbsp;以及(?P&lt;name&gt;)语法.&nbsp;之前版本仅接受(?P&lt;name&gt;)语法.</p>
+</blockquote>
+<p>例如：<strong>$mode&nbsp;=&nbsp;'/a=(\d+)b=(?P&lt;sec&gt;\d+)c=(\d+)/';</strong></p>
+<p>使用时结果为：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">array</span> (size=5<span style="color: #000000;">)
+
+  </span>0 =&gt; <span style="color: #0000ff;">string</span> 'a=4b=98c=56' (length=11<span style="color: #000000;">)
+
+  </span>1 =&gt; <span style="color: #0000ff;">string</span> '4' (length=1<span style="color: #000000;">)
+
+  </span>'sec' =&gt; <span style="color: #0000ff;">string</span> '98' (length=2<span style="color: #000000;">)
+
+  </span>2 =&gt; <span style="color: #0000ff;">string</span> '98' (length=2<span style="color: #000000;">)
+
+  </span>3 =&gt; <span style="color: #0000ff;">string</span> '56' (length=2)</pre>
+</div>
+<p>&nbsp;&nbsp;在保留索引数组的同时，加上一个关联项，key值为捕获组名。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">捕获组的反向引用</span></strong></p>
+<p>我们在用preg_replace()函数进行正则替换时，我们还可以使用&nbsp;<strong><span style="color: #ff0000;">\n&nbsp;</span></strong>或&nbsp;<span style="color: #ff0000;"><strong>$n&nbsp;</strong></span>来引用第n个捕获组.</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$mode</span> = '/a=(\d+)b=(\d+)c=(\d+)/'<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$str</span>='**a=4b=98c=56**'<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$rp</span>='\1/$2/\3/'<span style="color: #000000;">;
+
+</span><span style="color: #0000ff;">echo</span> <span style="color: #008080;">preg_replace</span>(<span style="color: #800080;">$mode</span>,<span style="color: #800080;">$rp</span>,<span style="color: #800080;">$str</span>);<span style="color: #008000;">//</span><span style="color: #008000;">**4/98/56/**</span></pre>
+</div>
+<p>\1表示捕获组1(4),$2为捕获组2(98),\3为捕获组3(56)。</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">非捕获组的用法：</span></strong></p>
+<p>为什么称为非捕获组呢？那是因为它们有捕获组的特性，在匹配模式的()中，但是匹配时，PHP不会为它们编组，它们只会影响匹配结果，并不作为结果输出。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong>/d(?=xxx) &nbsp; &nbsp;</strong>匹配"<strong><span style="color: #ff0000;">后面</span></strong>是xxx的一个数字"。</p>
+<p>注意格式：只能放在匹配模式字符串<strong><span style="color: #ff0000;">之后</span></strong>！</p>
+<p>例如：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$pattern</span>='/\d(?=abc)/'<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$str</span>="ab36abc8eg"<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$res</span>=<span style="color: #008080;">preg_match</span>(<span style="color: #800080;">$pattern</span>,<span style="color: #800080;">$str</span>,<span style="color: #800080;">$match</span><span style="color: #000000;">);
+
+</span><span style="color: #008080;">var_dump</span>(<span style="color: #800080;">$match</span>);<span style="color: #008000;">//</span><span style="color: #008000;">6</span></pre>
+</div>
+<p>匹配的6，因为只有它作为一个数字，后面还有abc。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong>(?&lt;=xxx)&nbsp;</strong><strong style="line-height: 23.3333px;">/d</strong><strong style="line-height: 1.5;">&nbsp;</strong><span style="line-height: 1.5;">匹配"</span><span style="line-height: 1.5; color: #ff0000;"><strong>前面</strong></span><span style="line-height: 1.5;">是xxx的一个数字"</span></p>
+<p>注意格式：只能放在匹配模式字符串<strong><span style="color: #ff0000;">之前</span></strong>！</p>
+<p>例如：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$pattern</span>='/(?&lt;=abc)\d/'<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$str</span>="ab36abc8eg"<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$res</span>=<span style="color: #008080;">preg_match</span>(<span style="color: #800080;">$pattern</span>,<span style="color: #800080;">$str</span>,<span style="color: #800080;">$match</span><span style="color: #000000;">);
+
+</span><span style="color: #008080;">var_dump</span>(<span style="color: #800080;">$match</span>);<span style="color: #008000;">//8</span><span style="color: #008000;"><br /></span></pre>
+</div>
+<p>匹配的8，因为只有它作为一个数字，后面还有abc。</p>
+<hr />
+<p>&nbsp;</p>
+<p>与(?=xxx)&nbsp;&nbsp;(?&lt;=xxx)相对的是(?!=xxx)&nbsp;&nbsp;(?&lt;!=xxx) 它们在=前加了非运算符 &ldquo;<strong style="color: #ff0000; line-height: 23.3333px;">!</strong><span style="line-height: 1.5;">&rdquo;</span></p>
+<p>&nbsp;</p>
+<p>它表示前面/后面<span style="color: #ff0000;"><strong>不是</strong></span>xxx的字符串，这里就不再举例了。</p>
+<p>如果您觉得本博文对您有帮助，您可以推荐或关注我，如果您有什么问题，可以在下方留言讨论，谢谢。</p>

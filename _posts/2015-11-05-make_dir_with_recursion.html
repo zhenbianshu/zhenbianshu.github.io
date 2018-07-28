@@ -1,0 +1,94 @@
+---
+layout: post
+title: "PHP递归创建多级目录（一道面试题的解题过程）"
+date: 2015-11-05 18:00:08 +0800
+comments: true
+---
+
+<p>今天看到一道面试题，要写出一个可以创建多级目录的函数：</p>
+<hr />
+<p>&nbsp;</p>
+<p>我的第一个感觉就是用递归创建，具体思路如下：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">function</span> Directory(<span style="color: #800080;">$dir</span><span style="color: #000000;">){
+
+</span><span style="color: #0000ff;">　　　　if</span>(<span style="color: #008080;">is_dir</span>(<span style="color: #800080;">$dir</span>) || @<span style="color: #008080;">mkdir</span>(<span style="color: #800080;">$dir</span>,0777)){ <span style="color: #008000;">//</span><span style="color: #008000;">查看目录是否已经存在或尝试创建，加一个@抑制符号是因为第一次创建失败，会报一个&ldquo;父目录不存在&rdquo;的警告。</span>
+
+　　　　　　　　<span style="color: #0000ff;">echo</span> <span style="color: #800080;">$dir</span>."创建成功&lt;br&gt;";   <span style="color: #008000;">//</span><span style="color: #008000;">输出创建成功的目录</span>
+<span style="color: #000000;">
+　　　　}</span><span style="color: #0000ff;">else</span><span style="color: #000000;">{
+
+　　　　　　　　</span><span style="color: #800080;">$dirArr</span>=<span style="color: #008080;">explode</span>('/',<span style="color: #800080;">$dir</span>); <span style="color: #008000;">//</span><span style="color: #008000;">当子目录没创建成功时，试图创建父目录，用explode()函数以'/'分隔符切割成一个数组</span>
+
+　　　　　　　　<span style="color: #008080;">array_pop</span>(<span style="color: #800080;">$dirArr</span>); <span style="color: #008000;">//</span><span style="color: #008000;">将数组中的最后一项（即子目录）弹出来，</span>
+
+　　　　　　　　<span style="color: #800080;">$newDir</span>=<span style="color: #008080;">implode</span>('/',<span style="color: #800080;">$dirArr</span>); <span style="color: #008000;">//</span><span style="color: #008000;">重新组合成一个文件夹字符串</span>
+<span style="color: #000000;">
+　　　　　　　　Directory(</span><span style="color: #800080;">$newDir</span>); <span style="color: #008000;">//</span><span style="color: #008000;">试图创建父目录</span>
+
+　　　　　　　　<span style="color: #0000ff;">if</span>(@<span style="color: #008080;">mkdir</span>(<span style="color: #800080;">$dir</span>,0777<span style="color: #000000;">)){
+
+　　　　　　　　　　　　</span><span style="color: #0000ff;">echo</span> <span style="color: #800080;">$dir</span>."创建成功&lt;br&gt;"<span style="color: #000000;">;
+
+　　　　　　　　} </span><span style="color: #008000;">//</span><span style="color: #008000;">再次试图创建子目录,成功输出目录名</span>
+<span style="color: #000000;">
+　　　　}
+
+}
+
+Directory(</span>"A/B/C/D/E/F");</pre>
+</div>
+<p>输出结果如图：<img src="/images/819496-20151105113656367-1930695880.png" alt="" /></p>
+<hr />
+<p>&nbsp;</p>
+<p>但是可以看得出来，写得也太麻烦了，在手册里翻看文件函数，看到一个<strong>dirname()</strong>函数，其原型如下：</p>
+<blockquote>
+    <p>string&nbsp;dirname&nbsp;(&nbsp;string&nbsp;$path&nbsp;)</p>
+    <p>给出一个包含有指向一个文件的全路径的字符串，本函数返回去掉文件名后的目录名。&nbsp;</p>
+    <p>在&nbsp;Windows&nbsp;中，斜线（/）和反斜线（\）都可以用作目录分隔符。在其它环境下是斜线（/）。</p>
+</blockquote>
+<p>可以稍稍地优化一下：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">function</span> Directory(<span style="color: #800080;">$dir</span><span style="color: #000000;">){
+
+　　　　</span><span style="color: #0000ff;">if</span>(<span style="color: #008080;">is_dir</span>(<span style="color: #800080;">$dir</span>) || @<span style="color: #008080;">mkdir</span>(<span style="color: #800080;">$dir</span>,0777<span style="color: #000000;">)){
+
+　　　　　　　　</span><span style="color: #0000ff;">echo</span> <span style="color: #800080;">$dir</span>."创建成功&lt;br&gt;"<span style="color: #000000;">;
+
+　　　　}</span><span style="color: #0000ff;">else</span><span style="color: #000000;">{
+
+　　　　　　　　Directory(</span><span style="color: #008080;">dirname</span>(<span style="color: #800080;">$dir</span><span style="color: #000000;">));
+
+　　　　　　　　</span><span style="color: #0000ff;">if</span>(@<span style="color: #008080;">mkdir</span>(<span style="color: #800080;">$dir</span>,0777<span style="color: #000000;">)){
+
+　　　　　　　　　　　　</span><span style="color: #0000ff;">echo</span> <span style="color: #800080;">$dir</span>."创建成功&lt;br&gt;"<span style="color: #000000;">;
+
+　　　　　　　　}
+
+　　　　}
+
+}</span></pre>
+</div>
+<p>效果一样。</p>
+<hr />
+<p>&nbsp;</p>
+<p>之后我在在网上搜一下答案，找到一个异常精辟的：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">function</span>  Directory( <span style="color: #800080;">$dir</span><span style="color: #000000;"> ){
+
+     </span><span style="color: #0000ff;">return</span>   <span style="color: #008080;">is_dir</span> ( <span style="color: #800080;">$dir</span> )  or  Directory(<span style="color: #008080;">dirname</span>( <span style="color: #800080;">$dir</span> ))  and   <span style="color: #008080;">mkdir</span> ( <span style="color: #800080;">$dir</span> , 0777<span style="color: #000000;">);
+
+}</span></pre>
+</div>
+<p>现在来解释一下整个函数：</p>
+<p>先介绍一下PHP中逻辑运算符的优先级顺序：<strong><span style="font-size: 15px;">&amp;&amp; &gt; || &gt; and &gt; or</span></strong>，即符号型&gt;字母型，AND型&gt;OR型，所以函数体可以看成：</p>
+<p><strong>is_dir&nbsp;(&nbsp;$dir&nbsp;)&nbsp;&nbsp;or&nbsp;&nbsp;(Directory(dirname(&nbsp;$dir&nbsp;))&nbsp;&nbsp;and&nbsp;&nbsp;&nbsp;mkdir&nbsp;(&nbsp;$dir&nbsp;,&nbsp;0777));</strong></p>
+<p>先判断目标目录是否存在，若存在，依or的短路特性，后面的整体被短路，跳过执行；若目标目录不存在，则执行后面的函数体：</p>
+<p><strong>Directory(dirname(&nbsp;$dir&nbsp;))&nbsp;&nbsp;and&nbsp;&nbsp;&nbsp;mkdir&nbsp;(&nbsp;$dir&nbsp;,&nbsp;0777)&nbsp;</strong></p>
+<p>我考虑了一下先进行递归的用意：先执行递归，意在确认其父目录(dirname($dir))都已经创建完毕，使后面的mkdir()函数不会创建子目录时找不到父目录发出警告。</p>
+<p>进入递归深处后，确认最深处的根目录存在后，从根目录向下依次创建目录。</p>
+<hr />
+<p>&nbsp;</p>
+<p>最后，建议要找工作的亲们，去网上找些大公司面试题做一下，毕竟他们考得较为综合较深，在学习知识的时候，也刷一下题，另外也一定要做一下，因为很容易眼高手低，一开始的函数，我优化了好几遍才能正常使用。</p>
+<p>以后我也会再找些有意思的面试题跟大家分享。</p>
+<p>如果您觉得本博文对您有帮助，您可以推荐或关注我，如果您有什么问题，可以在下方留言讨论，谢谢。</p>

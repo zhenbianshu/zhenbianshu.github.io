@@ -1,0 +1,95 @@
+---
+layout: post
+title: "PHP模拟发送POST请求之四、加强file_get_contents()发送POST请求"
+date: 2015-11-03 18:00:08 +0800
+comments: true
+---
+
+<p>使用了笨重fsockopen()方法后，我们开始在PHP函数库里寻找更简单的方式来进行POST请求，这时，我们发现了PHP的文件函数也具有与远程URL交互的功能。</p>
+<p>最简单的是fopen()和fread()函数。</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$fp</span>=<span style="color: #008080;">fopen</span>('http://localhost?query=query','r'<span style="color: #000000;">);
+
+</span><span style="color: #800080;">$content</span>=<span style="color: #008080;">fread</span>(<span style="color: #800080;">$fp</span>,1024<span style="color: #000000;">);
+
+</span><span style="color: #0000ff;">echo</span> <span style="color: #800080;">$content</span>;<span style="color: #008000;">//</span><span style="color: #008000;">输出HTML文档信息</span>
+
+<span style="color: #008080;">fclose</span>(<span style="color: #800080;">$fp</span>);</pre>
+</div>
+<p>然后是file_get_contents()函数：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$content</span>=<span style="color: #008080;">file_get_contents</span>('http://localhost?query=query'<span style="color: #000000;">);
+
+</span><span style="color: #0000ff;">echo</span> <span style="color: #800080;">$content</span>;<span style="color: #008000;">//</span><span style="color: #008000;">输出HTML文档信息</span></pre>
+</div>
+<p>但是，我们会发现，通这两种方式我们只能通过GET方式发送信息并读取网页信息，而且，这两种方式还面临着超时，无法处理头信息等问题。</p>
+<hr />
+<p>&nbsp;</p>
+<p>不过，我们仔细查看file_get_contents()的函数原型：</p>
+<blockquote>
+    <p>string&nbsp;file_get_contents&nbsp;(&nbsp;string&nbsp;$filename&nbsp;[,&nbsp;bool&nbsp;$use_include_path&nbsp;[,&nbsp;resource&nbsp;$context&nbsp;[,&nbsp;int&nbsp;$offset&nbsp;[,&nbsp;int&nbsp;$maxlen&nbsp;]]]]&nbsp;)</p>
+</blockquote>
+<p>我们发现它还有其他可选参数，我们可以通过这些参数的设置，在发送网页请求的同时，POST出我们的数据，下面来解释各个参数的意义。</p>
+<ul>
+    <li>$filename：不用多说，填写我们要访问的URL字符串就行。</li>
+    <li>$use_include_path：是否使用文件之前include_path()设置的路径，如果使用，在文件地址找不到时，会自动去include_path()设置的路径去寻找，网页地址中我们设置为false。</li>
+    <li>$context：环境上下文，resource类型，由函数&nbsp;stream_context_create()&nbsp;返回的&nbsp;context来设置，也是我们进行file_get_contents()函数扩展的重点，接下来再说。</li>
+    <li>$offset:读取的内容相对文件开始内容的偏移字节，我们读取网页内容，要保证HTML文档的完整性，所以可以设置为0或者不设置，默认为0。</li>
+    <li>$maxlen:顾名思义，是读取文件的最大字节数，同offset我们不设置，读取网页的全部内容。</li>
+</ul>
+<hr />
+<p>&nbsp;</p>
+<p>通过file_get_contents发送POST请求的重点就在$context参数上面，我们用stream_context_create()函数设置上下文。</p>
+<p><strong>stream_context_create()创建的上下文选项即可用于流(stream)，也可用于文件系统(file&nbsp;system)。对于像&nbsp;file_get_contents()、file_put_contents()、readfile()直接使用文件名操作而没有文件句柄的函数来说更有用。stream_context_create()增加header头只是一部份功能，还可以定义代理、超时等。</strong></p>
+<p>我们来看stream_context_create()函数的原型：</p>
+<blockquote>
+    <p>resource&nbsp;stream_context_create&nbsp;([&nbsp;array&nbsp;$options&nbsp;[,&nbsp;array&nbsp;$params&nbsp;]]&nbsp;)</p>
+</blockquote>
+<p>我们看到，通过传入设置数组用此函数来获取一个资源类型的上下文选项。</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$context</span> = <span style="color: #008080;">stream_context_create</span>(<span style="color: #0000ff;">array</span>( 　　　　　　　　　　　　　　　　　　　　<span style="color: #008000;">//</span><span style="color: #008000;">传入数组类型的$option参数</span>
+
+　　　　'http' =&gt; <span style="color: #0000ff;">array</span>( 　　　　　　　　　　　　　　　　　　　　　　　　　　　　　<span style="color: #008000;">//</span><span style="color: #008000;">以HTTP请求为键的设置数组</span>
+
+　　　　　　　　'method'  =&gt; 'POST', 　　　　　　　　　　　　　　　　　　　　　　　　<span style="color: #008000;">//</span><span style="color: #008000;">设置请求方法为POST</span>
+
+　　　　　　　　'header'  =&gt; "Content-type: application/x-www-form-urlencoded",<span style="color: #008000;">//</span><span style="color: #008000;">通过设置头文件来设置POST数据格式</span>
+
+　　　　　　　　'content' =&gt; <span style="color: #008080;">http_build_query</span>(<span style="color: #800080;">$query_info</span>),　　　　　　　　　　　<span style="color: #008000;">//</span><span style="color: #008000;">用http_build_query()方法将数组拼合成数据字符串</span>
+
+　　　　　　　　'timeout' =&gt; 20　　　　　　　　　　　　　　　　　　　　　　　　    　　<span style="color: #008000;">//</span><span style="color: #008000;">设置请求的超时时间。</span>
+<span style="color: #000000;">
+　　　　)
+
+)); </span></pre>
+</div>
+<p>&nbsp;</p>
+<p>设置好上下文，我们通过file_get_contents()函数进行POST数据提交。</p>
+<div class="cnblogs_code">
+    <pre><span style="color: #800080;">$results</span> = <span style="color: #008080;">file_get_contents</span>('http://localhost', <span style="color: #0000ff;">false</span>, <span style="color: #800080;">$context</span>); </pre>
+</div>
+<p>下面是POST请求的完整示例：&nbsp;</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$info</span>=['eat'=&gt;'2kg','run'=&gt;'10km'<span style="color: #000000;">] ;
+
+</span><span style="color: #800080;">$url</span>='http://localhost'<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$context</span> = <span style="color: #008080;">stream_context_create</span>(<span style="color: #0000ff;">array</span><span style="color: #000000;">(
+
+    </span>'http' =&gt; <span style="color: #0000ff;">array</span><span style="color: #000000;">(
+
+      　　</span>'method' =&gt; 'POST',
+
+      　　'header' =&gt; 'Content-type:application/x-www-form-urlencoded',
+
+      　　'content' =&gt; http_build_query(<span style="color: #800080;">$info</span>),
+
+      　　'timeout' =&gt; 20<span style="color: #000000;">
+
+    )
+
+));
+
+</span><span style="color: #800080;">$result</span> = <span style="color: #008080;">file_get_contents</span>(<span style="color: #800080;">$url</span>, <span style="color: #0000ff;">false</span>, <span style="color: #800080;">$context</span>);</pre>
+</div>
+<p>如果您觉得本文对您有帮助，您可以推荐或关注我，另外，如果有什么问题，可以在下方留言讨论，谢谢。</p>

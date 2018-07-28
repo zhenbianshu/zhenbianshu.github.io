@@ -1,0 +1,127 @@
+---
+layout: post
+title: "搭建自己的PHP框架心得（二）"
+date: 2016-04-04 18:00:08 +0800
+comments: true
+---
+
+<h1>续言</h1>
+<p>对于本次更新，我想说：</p>
+<ul>
+    <li>本框架由本人挑时间完善，而我还不是PHP大神级的人物，所以框架漏洞难免，求大神们指出。</li>
+    <li>本框架的知识点应用都会写在博客里，大家有什么异议的可以一起讨论，也希望看博客的也能学习到它们。</li>
+    <li>本次更新，更新了函数规范上的一些问题，如将函数尽量的独立化，每一个函数尽量只单独做好一件事情，尽量减少函数依赖。还对框架的整体优化了一下，添加了SQ全局类，用以处理全局函数，变量。</li>
+</ul>
+<p>再次贴出GITHUB地址：<a href="https://github.com/zhenbianshu/sqier">Sqier框架GITHUB地址</a></p>
+<hr />
+<h1>回调函数</h1>
+<p>替换了很low的类名拼装实例化，然后拼装方法名的用法，使用PHP的回调函数方式：</p>
+<p>原代码：</p>
+<pre><code>$controller_name = 'Controller\\' . self::$c_name;
+$action_name = self::$a_name . 'Action';
+$controller = new $controller_name();
+$controller-&gt;$action_name();
+</code></pre>
+<p>修改后代码</p>
+<pre><code>    $controller_name = 'Controller\\' . self::$c_name;
+    $controller = new $controller_name();
+    call_user_func([
+        $controller,
+        self::$a_name . 'Action'
+    ]);
+</code></pre>
+<p>这里介绍一下PHP的函数回调应用方式：call_user_func和call_user_func_array:</p>
+<blockquote>
+    <p>call_user_func ( callback $function [, mixed $parameter [, mixed $... ]] )</p>
+    <p>调用第一个参数所提供的用户自定义的函数。</p>
+    <p>返回值：返回调用函数的结果，或FALSE。</p>
+</blockquote>
+<p>call_user_func_array()的用法跟call_user_func类似，只不过传入的参数params整体为一个数组。</p>
+<p>另外，call_user_func系列函数还可以传入在第一个参数里传入匿名参数，可以很方便的回调某些事件，这些特性在复杂的框架里应用也十分广泛，如yii2的事件机制里回调函数的使用就是基于此。</p>
+<hr />
+<h1>VIEW层和ob函数</h1>
+<p>框架在controller的基类中定义了render方法来渲染页面，它会调用类VIEW的静态函数来分析加载对应页面的模板。</p>
+<pre><code>public static function display($data, $view_file) {
+
+    if(is_array($data)) {
+        extract($data);//extract函数解析$data数组中的变量
+    }else {
+        //抛出变量类型异常
+    }
+
+    ob_start();
+    ob_implicit_flush(0);
+    include self::checkTemplate($view_file);//自定义checkTemplate函数，分析检查对应的函数模板，正常返回路径
+    $content = ob_get_clean();
+
+    echo $content;
+}
+</code></pre>
+<p>这里重点说一下ob（output buffering）系列函数，其作用引用简明代魔法的ob作用介绍：</p>
+<ul>
+    <li>防止在浏览器有输出之后再使用setcookie，或者header，session_start函数造成的错误。其实这样的用法少用为好，养成良好的代码习惯。</li>
+    <li>捕捉对一些不可获取的函数的输出，比如phpinfo会输出一大堆的HTML，但是我们无法用一个变量例如$info=phpinfo();来捕捉，这时候ob就管用了。</li>
+    <li>对输出的内容进行处理，例如进行gzip压缩，例如进行简繁转换，例如进行一些字符串替换。</li>
+    <li>生成静态文件，其实就是捕捉整页的输出，然后存成文件，经常在生成HTML，或者整页缓存中使用。</li>
+</ul>
+<p>它在ob_start()函数执行后，打开缓冲区，将后面的输出内容装进系统的缓冲区，ob_implicit_flush（0）函数来关闭绝对刷送（echo等）,最后使用ob_get_clean()函数将缓冲区的内容取出来。</p>
+<hr />
+<h1>类__URL__常量和全局类</h1>
+<p>TP里的__URL__等全局常量用着很方便，可以很简单的实现跳转等操作，而定义它的函数createUrl函数我又想重用，于是借鉴YII的全局类定义方法：</p>
+<p>定义基类及详细方法（以后的全局方法会写在这里）</p>
+<pre><code>class BaseSqier{
+    //方法根据传入的$info信息，和当前URL_MODE解析返回URL字符串
+    public static function createUrl($info = '') {
+        $url_info = explode('/', strtolower($info));
+        $controller = isset($url_info[1]) ? $url_info[0] : strtolower(CONTROLLER);
+        $action = isset($url_info[1]) ? $url_info[1] : $url_info[0];
+        switch(URL_MODE){
+            case URL_COMMON:
+                return "/index.php?r=" . $controller . '/' . $action;
+            case URL_REWRITE:
+                return '/' .$controller . '/' . $action;
+        }
+    }
+ }
+</code></pre>
+<p>在启动文件中定义类并继承基类；</p>
+<pre><code>require_once SQ_PATH.'BaseSqier.php';
+class SQ extends BaseSqier{
+}
+</code></pre>
+<p>在全局内都可以直接使用SQ::createUrl()方法来创建URL了。这样，定义__URL__常量就很轻松了。</p>
+<hr />
+<h1>用单例模式定义数据库连接基类</h1>
+<pre><code>class Db {
+    protected static $_instance;
+    public static function getInstance() {
+        if(!(self::$_instance instanceof self)) {
+            self::$_instance = new self();
+        }
+        return self::$_instance;
+    }
+
+    private function __construct() {
+        $link = new \mysqli(DB_HOST, DB_USER, DB_PWD, DB_NAME) or die("连接数据库失败,请检查数据库配置信息!");
+        $link-&gt;query('set names utf8');
+    }
+    public function __clone() {
+        return self::getInstance();
+    }
+}
+</code></pre>
+<p>使用单例模式的核心是：</p>
+<ul>
+    <li>私有化构造函数，使无法用new来创建对象，也防止子类继承它并改写其构造函数；</li>
+    <li>用静态变量存放当前对象，定义静态方法来返回对象，如对象还未实例化，实例化一个，存入静态变量并返回。</li>
+    <li>构造其__clone魔术方法，防止clone出一个新的对象；</li>
+</ul>
+<hr />
+<h1>DB类的sql查询函数</h1>
+<p>DB查询函数是一个很复杂的部分，它是一个自成体系的东西，像TP和YII的查询方法都有其独特的地方。我这里暂时先借用TP的MODEL基类，有时间再慢慢补这个。</p>
+<p>嗯，介绍一下像TP的查询里的方法联查的实现，其诀窍在于，在每个联查方法的最后都用 <code>return this</code> 来返回已处理过的查询对象。</p>
+<hr />
+<h1>后续</h1>
+<p>yii2里的数据表和model类属性之间的映射很酷（虽然被深坑过）， 前面一直避开的模块（module，我可以想像得到把它也添加到URI时解析的麻烦）有时间考虑一下。</p>
+<p>边写边优化。</p>
+<p>嗯，待续...</p>

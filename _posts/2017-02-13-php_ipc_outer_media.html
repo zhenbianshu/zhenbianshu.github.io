@@ -1,0 +1,182 @@
+---
+layout: post
+title: "从并发处理谈PHP进程间通信（一）外部介质"
+date: 2017-02-13 18:00:08 +0800
+comments: true
+---
+
+<h1 id="toc_0">进程间通信</h1>
+<p>进程间通信（IPC，Inter-Process Communication），多进程开发中，进程间通信是一个永远也绕不开的问题。在 web开发中，我们经常遇到的并发请求问题，本质上也可以作为进程间通信来处理。</p>
+<blockquote>
+    <p>进程间通信，指至少两个进程或线程间传送数据或信号的一些技术或方法。进程是计算机系统分配资源的最小单位(严格说来是线程)。每个进程都有自己的一部分独立的系统资源，彼此是隔离的。为了能使不同的进程互相访问资源并进行协调工作，才有了进程间通信。</p>
+</blockquote>
+<p>根据定义可知，要进行进程间通信，我们需要解决两个问题：</p>
+<ul>
+    <li>互相访问：消息传输和暂时存储介质选择问题；</li>
+    <li>协调工作：消息的存取冲突问题；</li>
+</ul>
+<p>文章介绍的中心就是围绕着这么两点来说的， 为了更使文章更简明，这边以之前在公司做的一个需求为例:</p>
+<p><em>需要一个循环ID生成器，循环生成从 Min 到 Max 的数字ID，在ID递增到 Max 后，返回到 Min 重新开始递增；必须能保证多个进程并发请求时生成的ID不同。</em></p>
+<p>此需求要解决的问题恰好为我们要解决的进程间通信需要解决的两个问题：</p>
+<ul>
+    <li>需要一个消息传输通道来传输和存储当前的递增值。这个比较容易解决，我们常用的文件、数据库、session、缓存等都能做到。</li>
+    <li>需要解决多进程同时访问生成器生成相同ID的问题。要满足这个需要就必须要用到锁了，而且为了保证多个进程读取的数据是不同的，需要互斥锁，另外为了能保证调用成功率，锁的获取最好能实现自旋。</li>
+</ul>
+<p>本文通过此需求的不同实现，来介绍通过外部介质进行的进程间通信的方式。另外，不只PHP语言，其他语言也能使用这些方法。</p>
+<p>文章如有错漏之处，烦请指出，如果您有更优的办法，欢迎在下面留言讨论。</p>
+<hr />
+<h1 id="toc_1">文件</h1>
+<h3 id="toc_2">flock</h3>
+<p>文件是最基本的存储介质，它当然可以作为消息的传输通道来使用。文件的存取各种语言都有各自的多种方案，问题点是多进程并发时的冲突问题。</p>
+<p>解决存取冲突问题我们使用PHP的&nbsp;<code>flock()&nbsp;</code>函数：</p>
+<p><code>bool flock ( resource $handle , int $operation [, int &amp;$wouldblock ] )</code></p>
+<ul>
+    <li>$handler 是 使用<code>fopen($path_to_file)</code>获取到的文件句柄；</li>
+    <li>
+        <p>$operation 是 对文件加锁的方式，有以下值可选：</p>
+        <p>LOCK_SH (获取共享锁) / LOCK_EX (获取互斥锁) / LOCK_UN (解锁)</p>
+        <p>这里我们选用互斥锁，一个进程获取到互斥锁后，其他进程在尝试获取锁会被阻塞，直到锁被释放，即实现了自旋；</p>
+        <p>此外，还有一个参数 LOCK_NB，flock 在获取不到锁时，默认会阻塞住直到锁被其他进程释放，传入 LOCK_NB 与 LOCK_SH 或 LOCK_EX 进行或运算结果（<code>LOCK_EX | LOCK_NB</code>），flock 在锁被其他进程占有时，不会阻塞，而是直接返回 false，这里仅作介绍，我们并不使用它。</p>
+    </li>
+    <li>
+        <p>$wouldblock 参数是一个引用值，在获取不到锁，且不阻塞模式时，$wouldblock 会被设置为 true；（手册中说阻塞时才会被设置为 true。其实我也奇怪这个变量名的。不知道是不是 bug，我的PHP版本是 5.4.5，有知道的烦请解惑）</p>
+    </li>
+</ul>
+<h3 id="toc_3">代码实现</h3>
+<p>下面是循环ID生成器代码，说明在注释中:</p>
+<div>
+<pre><code class="language-none">
+function getCycleIdFromFile($max, $min = 0) {
+    $handler = fopen('/tmp/cycle_id_generator.txt', 'c+');
+    if (!flock($handler, LOCK_EX)) {
+        throw new Exception('error_get_file_lock!');
+    }
+
+    $cycle_id = trim(fread($handler, 9));
+    $cycle_id++;
+
+    if ($cycle_id &gt; $max) {
+        $cycle_id = $min;
+    }
+
+    // 文件指针返回到文件头,并向文件内写入新的cycle_id
+    rewind($handler);
+    fwrite($handler, $cycle_id);
+
+    // 多写入一些空格为了防止数值升到多位后,突然置为少位后面的数字仍保留
+    fwrite($handler, str_repeat(' ', 9));
+
+    flock($handler, LOCK_UN);
+
+    return $cycle_id;
+}</code></pre>
+</div>
+<hr />
+<h1 id="toc_4">mysql</h1>
+<h3 id="toc_5">select for update</h3>
+<p>我们常用的 mysql 也可以被当作中间介质来实现进程间的通信，我们规定好某一个数据表内的某一行数据作为消息交换的中转站，使用 mysql 自带的锁来协调多个进程的存取冲突。</p>
+<p>事务的设计目的就是为了解决多进程并发查询时数据冲突的问题，可是我们常用的事务只能保证数据冲突时会被回滚，数据不会出现错误，并不能实现请求的并行化。对一些数据冲突回滚的请求，需要我们在外层添加逻辑重试。</p>
+<p>这里介绍 mysql 的一种语法： <code>select for update</code>，会给固定数据加上互斥锁，且另一个请求在获取锁失败时，会阻塞至获取锁成功，mysql 帮我们实现了自旋；</p>
+<p>用法如下：</p>
+<ol>
+    <li>关闭 mysql 的自动提交，自动提交默认打开，除非使用 transition 语句显示开启事务，默认会将每一条 sql 作为一个事务直接提交执行，这里关闭。 <code>set autocommit=0;</code></li>
+    <li>使用<code>select for update</code> 语句给数据添加互斥锁。注意：需求 mysql 的 innodb 引擎支持;</li>
+    <li>进行数据更新和处理操作；</li>
+    <li>主动提交事务，并将 自动提交恢复；<code>commit; set autocommit=1;</code></li>
+</ol>
+<h3 id="toc_6">代码实现</h3>
+<p>然后是代码实现：</p>
+<div>
+<pre><code class="language-none">
+   // 数据库连接实现各有不同，demo 可以自己修改一下。
+   function getCycleIdFromMysql($max, $min = 0){
+        Db::db()-&gt;execute('set autocommit = 0');
+        $res = Db::db()-&gt;qsqlone('SELECT cycle_id FROM cycle_id_generator WHERE id = 1 FOR UPDATE');
+
+        $cycle_id = $res['cycle_id'] + 1;
+        if($cycle_id &gt; $max){
+            $cycle_id = $min;
+        }
+
+        Db::db()-&gt;execute("UPDATE cycle_id_generator SET cycle_id = {$cycle_id} WHERE id = 1");
+
+        Db::db()-&gt;execute('commit');
+        Db::db()-&gt;execute('set autocommit = 1');
+
+        return $cycle_id;
+    }
+</code></pre>
+</div>
+<hr />
+<h1 id="toc_7">redis</h1>
+<h3 id="toc_8">incr</h3>
+<p>redis 是我们常用的缓存服务器，由于其使用内存存储数据，性能很高。我们使用一个固定的普通键来作为消息中转站，然后利用其&nbsp;<code>incr&nbsp;</code>命令的原子性和其执行结果（递增后的值），实现 cycle_id 的递增。</p>
+<p><code>incr(key)</code> 若 key 不存在，redis 会先将值设置为0，然后执行递增操作；</p>
+<p>递增没有问题，可是我们还有个需求是在要其值达到 max 时，再将其置为 min，这时就可能会出现进程A在更新值为 min 时，另一个进程B也检测到值大于了 max，然后将值置为 min，可是这时的值已经不是 max，即发生了值重复更新，那么返回的值必然会有重复；</p>
+<p>这时，我们就需要自己来实现锁了。</p>
+<h3 id="toc_9">SETNX</h3>
+<p>redis 的 SETNX 命令检测某一个 key 是否存在，若不存在，则将 key 的值设置为 value,并返回结果1； 若 key 已存在，则设置失败，返回值0。</p>
+<p><code>SETNX key value</code></p>
+<p>它能实现锁是因为它是一个原子命令，即 检测 key 是否存在和设置 key 值在一个事务内，不会出现同时两个进程都检测到 key 不存在，然后同时去设置 key 的情况。</p>
+<p>我们以另一个值的存在与否，来表示 cycle_id 是否正在被另一个进程修改。</p>
+<h3 id="toc_10">代码实现</h3>
+<div>
+<pre><code class="language-none">
+    function getCycleIdFromRedis($max, $min = 0) {
+        $redis = new Redis();
+        $redis-&gt;connect('127.0.0.1', 6379);
+        $key_id = 'cycle_id_generator';
+
+        $cycle_id = $redis-&gt;incr($key_id);
+
+        if ($cycle_id &gt; $max) {
+            // 设置"锁键"的结果 = 获取互斥结果
+            $key_lock = 'cycle_id_lock';
+            if (!$redis-&gt;setnx($key_lock, 1)) {
+                return null;
+            }
+
+            $cycle_id = $min;
+            $redis-&gt;set($key_id, $cycle_id);
+
+            // 最后别忘记释放互斥锁
+            $redis-&gt;delete($key_lock);
+        }
+
+        $redis-&gt;close();
+
+        return $cycle_id;
+    }</code></pre>
+</div>
+<p>注意：由于 redis 里没有能实现自旋锁的命令，如果需求最高的获取成功率，我们在检测到 cycle_id 已经是最大值，且试图修改获取锁失败时，退出重试，在外层进行重试。</p>
+<div>
+<pre><code class="language-none">
+    function getCycleId($max, $min = 0) {
+        $cycle_id = getCycleIdFromRedis($max, $min);
+        if (!is_null($cycle_id)) {
+            return $cycle_id;
+        }
+        // 稍微等待下正在更改的进程
+        usleep(500);
+        // 这里使用递归,直至获取成功  并发很高,cycle_id重置很频繁时慎用.
+        return getCycleId($max, $min);
+    }</code></pre>
+</div>
+<h3 id="toc_11">优化</h3>
+<p>审查代码我们会发现，如果 max-min 的值很小的话，redis 会需要经常重置 key 的值，也就经常需要加锁，重试也就很多。这里，我提供一个优化方法：</p>
+<p>我们将其 max 设置为一个很大的值（要能被 max-min 整除），返回值时稍做处理，返回 <code>$current % ($max - $min) + $min;</code>。这样，key 需要递增到一个很大的值才会被重置，加锁逻辑和外层逻辑会很少执行到，达到提升效率的目的。</p>
+<h1 id="toc_12">总结：</h1>
+<p>这里简单的评价一下上面所说的三种方法：</p>
+<ul>
+    <li>
+        <p>性能上没有测试，而且 redis 的性能跟 ID 的大小差值相关，不过猜测在ID大小差值大的情况下 redis 应该更好一点。</p>
+    </li>
+    <li>
+        <p>代码上非常直观，使用 mysql 非常简洁，而且 redis 要自己实现自旋，比较恶心。</p>
+    </li>
+    <li>
+        <p>实现上，当然是文件最为方便，无任何添加。</p>
+    </li>
+</ul>
+<p>本文介绍的都是通过外部介质来进行的通信，下篇介绍下通过 PHP内置函数库来进行进程间通信，欢迎关注；</p>
+<p>如果您觉得本文对您有帮助，您可以点一下推荐。博客持续更新，欢迎关注。</p>

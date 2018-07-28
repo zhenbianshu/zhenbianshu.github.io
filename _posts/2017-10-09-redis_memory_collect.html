@@ -1,0 +1,124 @@
+---
+layout: post
+title: "Redis “瘦身”指南"
+date: 2017-10-09 18:00:08 +0800
+comments: true
+---
+
+<h1>前言</h1>
+<p>Redis 应该是开发者最常用的缓存服务器了，它丰富的数据结构，快速高效的内存操作能帮助开发者迅速完成复杂功能的设计，可以说让人一旦使用过后很难再离开它了，甚至在一些业务中，完全可以用 Redis 替代传统的关系型数据库 Mysql。</p>
+<p>作为一个内存型数据库，Redis 经常会遇到内存问题，今天我们来谈一下 Redis 常见的内存满的问题，介绍一下给 Redis &ldquo;瘦身&rdquo;的通用方式。</p>
+<p>文章经常被人爬，而且还不注明原地址，我在这里的更新和纠错没法同步，这里注明一下原文地址：http://www.cnblogs.com/zhenbianshu/p/7642682.html 以防误人子弟。</p>
+<hr />
+<h1 id="toc_1">Redis内存回收</h1>
+<p>Redis 服务器的最大占用内存量由配置项 <code>maxmemory</code> 决定，我们可以通过 <code>config set maxmemory 2GB</code> 的格式来配置。一旦 Redis 内存满，所有引起内存增加的操作都会被返回 error。作为专业 Redis 服务器我们通常将此项设置为<code>0</code>，以服务器系统内存来作为限制；</p>
+<p>那么 Redis 使用内存达到了上限怎么办？Redis 为我们提供了几种选项以自动回收内存，可以通过配置项 <code>maxmemory-policy</code> 来配置；</p>
+<ul>
+    <li><code>noeviction</code> 不回收；</li>
+    <li><code>allkeys-lru</code> 从所有键中删除最近最少使用的键；</li>
+    <li><code>volatile-lru</code> 从设置了过期时间的键中删除最近最少使用的键；</li>
+    <li><code>allkeys-random</code> 从所有键中随机删除；</li>
+    <li><code>volatile-random</code> 从设置了过期时间的键中随机删除；</li>
+    <li><code>volatile-ttl</code> 从设置了过期时间的键中选择存活时间最短的键删除；</li>
+</ul>
+<p>最大内存回收策略需要根据业务来配置，如果纯粹做缓存，<code>allkeys-lru</code>无疑是最合适的。如果存储了稍微重要的数据，为了防止 Redis 误删一些重要键，则需要选用 <code>noeviction</code>；</p>
+<p><code>allkeys-lru</code>、<code>allkeys-random</code> 在内存满时都有键可删，可以腾出内存，但如果配置了其他的策略，数据库用久了（根据业务量），随着业务发展和数据积累，通常会累积到到服务器内存占用率高，利用率低的情况，则可能会遇到内存占用满的问题。</p>
+<hr />
+<h1 id="toc_2">问题原由</h1>
+<p>产生问题的原因有：</p>
+<h3 id="toc_3">持久键废弃</h3>
+<p>这是导致此问题的最常见情况。</p>
+<p>有时候是开发人员的锅，开发不规范，未给有时效性的键设置过期时间，后续又不进行手动删除，键就成为无人管的孤儿键了。</p>
+<p>还可能是整个业务慢慢被废弃，不知道哪一天起，业务整体已不再维护了，一批键自然也就没用了。比这更严重的是，如果使用 List 传递数据，消费进程已被停止，但生产进程未同步停止，还在往 Redis 里写数据。</p>
+<h3 id="toc_4">过期键未回收</h3>
+<p>这个原因首先要谈到 Redis 的两种过期键删除策略：</p>
+<ul>
+    <li>惰性删除：在读取键时发现键已过期，则将其删除。</li>
+    <li>定期删除：Redis 会从所有设置了过期时间的键中选取 100 个，删除已过期的键，如果已过期的键超过 25 个，则再次进行此操作。 此删除操作由配置项 <code>hz</code> 决定，Redis 默认每秒进行 10 次；</li>
+</ul>
+<p>如果我们产生过期键的速度很快，最多可导致 Redis 25% 的过期键没有被及时删除。</p>
+<hr />
+<h1 id="toc_5">遍历清除垃圾键</h1>
+<p>由上，明白了问题产生的原因，解决 Redis 内存满的方法就明确了：清除这些垃圾键。 于是就面临着两个问题：</p>
+<h3 id="toc_6">如何遍历键</h3>
+<p>对于查找键，我们首先想到的是 <code>KEYS</code>，但 <code>KEYS</code> 的时间复杂度是<code>O(n)</code>，n 是 Redis 内键的总数，如果 Redis 内键很多还是会有性能问题，导致其他命令被阻塞的。</p>
+<p>这里介绍一个键遍历命令： <code>SCAN</code>。</p>
+<div>
+<pre class="line-numbers"><code class="language-none">SCAN cursor：
+
+0 =&gt; cursor, // cursor = 0 遍历结束
+1 =&gt; array(key1, key2...)</code></pre>
+</div>
+<p>需要注意的是 SCAN 命令是在版本<code>2.8.0</code> 加入的，如果是之前的版本，可以考虑解析 Redis 的 RDB 文件来获取所有的键。有坑，参见我之前的文章：<a href="http://www.cnblogs.com/zhenbianshu/p/7486530.html">扩充你的工具箱 - 大行文件的处理</a></p>
+<h3 id="toc_7">如何判断键是否垃圾</h3>
+<p>我们有三种异常键需要处理：</p>
+<ul>
+    <li>过期键：这些键会在被 SCAN 到时被自动删除，不再考虑。如果是解析 RDB 文件获取到的键，在查询时也会被自动删除；</li>
+    <li>长时间未读写的键，很可能是业务不再需要的键；</li>
+    <li>占用大量内存的键，有可能是在不停地写，但未消费。</li>
+</ul>
+<p>这里介绍 Redis 的另一个命令 <code>OBJECT</code>，使用它可以从内部查看 key 对象的状态。使用 <code>OBJECT IDLETIME key</code> 来获取 key 的闲置时间，我们可以判断 key 闲置时间大于一个时间段（根据业务自定）的为已废弃。</p>
+<p>此外还能使用 <code>OBJECT REFCOUNT key</code>获取 key 引用所储存的值的次数，<code>OBJECT ENCODING key</code> 获取 key 储存的值所使用的内部表示。</p>
+<h3 id="toc_8">获取键大小</h3>
+<p>而获取 Redis 某键占用内存大小，则通过另一个命令 <code>DEBUG OBJECT</code> 来获取，此命令会返回比<code>OBJECT</code>命令更详细的内部数据。</p>
+<div>
+<pre class="line-numbers"><code class="language-none">DEBUG OBJECT test
+Value at:0x7fb0ee16ebd0 refcount:1 encoding:embstr serializedlength:6 lru:12362780 lru_seconds_idle:4</code></pre>
+</div>
+<p>结果包括内存地址、引用数、内部编码表示、序列化后的长度、最近最少使用标识值，闲置时间，我们可以解析此结果串来获取对应的数据。</p>
+<p>需要注意，<code>key 作为复合键拥有大量字段时使用 DEBUG 命令计算内存会使 Redis 阻塞较长时间，且 Redis 官方并不建议在客户端使用此命令</code>。</p>
+<p>我们也可以先使用 <code>TYPE key</code> 获取键的类型，再根据类型获取其键的大小，如对字符串使用<code>LEN</code>，对 哈希表使用<code>HLEN</code>。</p>
+<p>要注意在删除特别大的复合键时，建议先逐步清空键内的字段，防止因字段过多，Redis 阻塞较长时间。</p>
+<h3 id="toc_9">管道加速</h3>
+<p>Redis 支持 <code>pipeline</code> 管道技术，一次 请求/响应 服务器能实现处理并响应多个请求。这样就可以将多个命令同时发送到服务器，不等待回复，直接在最后获取多个结果。</p>
+<p>PHP 中使用 <code>MULTI(Redis::PIPELINE)</code> 和 <code>EXEC()</code> 命令来实现管道；</p>
+<h3 id="toc_10">脚本实现</h3>
+<p>下面是个简单的脚本：</p>
+<div>
+<pre class="line-numbers"><code class="language-none">$redis = new Redis();
+$redis-&gt;connect('127.0.0.1');
+do {
+    $keys = $redis-&gt;scan($cursor);
+
+    $pipeline = $redis-&gt;multi(Redis::PIPELINE);
+    foreach ($keys as $key) {
+        $idle_time = $redis-&gt;object('idletime', $key);
+        if ($idle_time &gt; 180 * 24 * 3600) {
+            $pipeline-&gt;del($key);
+        }
+        // todo 判断类型进而判断占用内存大小，再删除
+    }
+    $pipeline-&gt;exec();
+} while ($cursor != 0);</code></pre>
+</div>
+<hr />
+<h1 id="toc_11">从根源避免问题</h1>
+<p>以上的脚本肯定也会在删除键时影响 Redis 的效率，最好的情况还是从根源就避免此类情况，以下是一些建议：</p>
+<ul>
+    <li>
+        <p>规范化开发；</p>
+        <p>首先是键命名要规范，让人见名知义，这样在人工排错或删除时也有判断依据，然后最好有完善的 Redis 键文档，以保证业务在很长时间，经手多人后也能资料可查。</p>
+    </li>
+    <li>
+        <p>使用 <code>HashSet</code> 替代 <code>Key-Value</code>；</p>
+        <p>将业务中某一族的键以 HashSet 的方式存储，以替代普通的 key-value 类型。不仅可以省去为每个键设置前缀以节约内存，也便于统一管理。</p>
+    </li>
+    <li>
+        <p>有时效性的键注意设置过期时间；</p>
+    </li>
+    <li>
+        <p>合理设置定时清除过期键频率 <code>hz</code>，在 Redis 不做多余操作的情况下，使过期键尽量能被删除；</p>
+    </li>
+    <li>
+        <p>做好 Redis 内存的监控，在达到某个阈值时查找问题并解决。</p>
+    </li>
+</ul>
+<hr />
+<h1 id="toc_12">小结</h1>
+<p>最后多絮叨两句经验：</p>
+<h3 id="toc_13">Redis假死</h3>
+<p>我在使用守护进程时 Redis 有假死情况，PHP 和 Redis 都不报错，但命令都返回 false，这种情况可以使用 Redis 的 ping() 命令，来探测 Redis 连接是否还在，如果不在则再建立新的连接。此问题很可能是由服务器配置引起的，如果您有知道此问题的原由或有好的解决办法，烦请指点一二。</p>
+<h3 id="toc_14">危险命令</h3>
+<p>不要在没看文档的情况下在线上使用 Redis 命令，例如 <code>debug segfault</code>，别问我怎么知道的。</p>
+<p>嗯，希望大家都能处理好跟 Redis 这个好朋友的关系。</p>
+<p>关于本文有什么问题可以在下面留言交流，如果您觉得本文对您有帮助，可以点击下面的 <strong><code>推荐</code></strong> 支持一下我。博客一直在更新，欢迎 <strong><code>关注</code></strong> 。</p>

@@ -1,0 +1,152 @@
+---
+layout: post
+title: "再谈加密-RSA非对称加密的理解和使用"
+date: 2017-01-15 18:00:08 +0800
+comments: true
+---
+
+<h1 id="toc_0">前言</h1>
+<p>随着互联网越来越渗透入我们生活的方方面面，各种私密信息在网络中传播，为了保证信息的真实可靠，在我们对其安全性的要求也越来越高，对此，加密是一个永远不过时的话题。非对称加密，全站HTTPS等，深入了解，总会遇到RSA加密算法。在一些特殊行业，如博主工作的互联网金融，RSA加密算法的重要性更是非同一般。</p>
+<p>可能由于密码学的枯燥，还有加密各种标准的混杂，加密与解密难以测试与验证，再加上大公司有大牛写框架，小公司多用demo，网上有关加密的知识不是很多，一开始尝试了解比较困难，所以我总结一下最近学习的一些知识，希望能帮到需要的人。</p>
+<p>由于RSA算法原理牵涉到的都是些数学知识，作为一个数学渣，不拿出来误导别人了。有感兴趣的，可以看一下阮一峰大神的博客：<a href="http://www.ruanyifeng.com/blog/2013/06/rsa_algorithm_part_one.html">RSA算法原理</a></p>
+<p>以前写过一篇PHP使用openssl扩展的博客：<a href="http://www.cnblogs.com/zhenbianshu/p/5659328.html">PHP的openssl加密扩展使用小结</a>，讲了一些加密基础和PHP中如何进行加密。本文主要聊一聊非对称加密的相关知识、RSA加密算法的数字证书操作，也会附带一些其他相关知识和使用心得。如文章有错漏之处，烦请指出，谢谢。</p>
+<hr />
+<h1 id="toc_1">数字证书</h1>
+<h3 id="toc_2">公钥传输问题</h3>
+<p>在密文传输过程中，客户端（Client C）向服务器（Server S）发送数据，C使用S的公钥加密，这样只有S使用自己的私钥解密才能拿到信息，其他人即使得到了数据，没有S的私钥也没用。</p>
+<p>但是如果有一个黑客H告诉C自己是S，并将自己的假公钥发送给C，那么C用假公钥加密数据并将数据发送给了H，那么H就顺利得到了信息，无法起到数据加密的作用。</p>
+<p>这就需要一个中间人来颁发一个身份证明来证明S是真的S。</p>
+<h3 id="toc_3">数字证书认证中心</h3>
+<p>这个中间人就是数字证书认证机构。</p>
+<p>数字证书认证中心(Certificate Authority)（也被称为证书认证机构或CA）是指颁发证书、废除证书、更新证书、验证证书、管理密钥的机构。它能在认证某组织或个人后分发证书的机构，它验证的信息包括已签约的证书，当然它也负责吊销有危害的证书。</p>
+<h3 id="toc_4">数字证书</h3>
+<p>中间人颁发的身份证明就是数字证书。</p>
+<p>数字证书是一个包含 证书拥有者公钥、证书拥有者信息、证书认证中心数字签名的文件。 拿到数字证书后，我们解析证书的证书认证机构数字签名确保证书是真的，且没有被篡改过后，取得其中的公钥，然后就可以使用此公钥与浏览器进行交互了。</p>
+<h3 id="toc_5">根证书</h3>
+<p>CA 这么重要，可是怎么能证明 CA 是真的呢？这个不用担心，许多 CA 都有嵌入在浏览器中的根证书，所以浏览器能自动识别它们。在一些API交互中，如请求支付宝的接口时，我们已经在本地存储了支付宝的证书了。</p>
+<p>不用担心本地的根证书安全问题，如果本地存储的根证书都被修改了，那么加解密也就没有什么意义了。</p>
+<h3 id="toc_6">证书链</h3>
+<p>由于世界上需要证书的组织众多，任何一家 CA 也不能处理全部的认证请求。于是大大小小的 CA 出现了，可是每个客户端不可能把他们的证书作为根证书全存储起来。</p>
+<p>于是CA建立自上而下的信任链，下级 CA 信任上级 CA，下级 CA 由上级 CA 颁发证书并认证。因为下级 CA 的证书是用上级 CA 的密钥加密的，而上级 CA 的密钥只有自己知道，因此别人无法冒充上级 CA 给别人发证书。</p>
+<p>在进行证书认证时，服务器会发给客户端一个包含着&ldquo;证书机构证书&rdquo;的证书，会层层链接到最上层的 CA，我们本地拥有最上级的 CA 的证书，如果能证明此 CA 的真实性，那么也便能证明服务器证书的可靠。</p>
+<h3 id="toc_7">证书标准</h3>
+<p>X.509是目前最能用的证书标准， 证书由用户公共密钥和用户标识符组成。此外还包括版本号、证书序列号、CA标识符、签名算法标识、签发者名称、证书有效期等信息。这一标准的最新版本是X.509 v3，它定义了包含扩展信息的数字证书。该版数字证书提供了一个扩展信息字段，用来提供更多的灵活性及特殊应用环境下所需的信息传送。</p>
+<hr />
+<h1 id="toc_8">RSA加密标准</h1>
+<h2 id="toc_9">公钥加密标准</h2>
+<p>公钥加密标准（Public Key Cryptography Standards, PKCS），此系列标准的设计与发布皆由RSA信息安全公司所制定。包括证书申请、证书更新、证书作废表发布、扩展证书内容以及数字签名、数字信封的格式等方面的一系列相关协议。</p>
+<p>目前在使用的最高版本为 PKCS#12，这版本也是我工作中使用最多的版本，此外我还接触过 PKCS#7 版本，java多用 PKCS#8 版本，下面分别说一下。</p>
+<h4 id="toc_10">PKCS#7：</h4>
+<p>定义一种通用的消息语法，包括数字签名和加密等用于增强的加密机制，PKCS#7与PEM兼容，所以不需其他密码操作，就可以将加密的消息转换成PEM消息。规范了以公开密钥基础设施（PKI）所产生之签名/密文之格式。其拓展数字证书在 S/MIME与CMS 的应用，PKCS#7一般主要用来做数字信封。</p>
+<h4 id="toc_11">PKCS#8</h4>
+<p>描述私有密钥信息格式，该信息包括公开密钥算法的私有密钥以及可选的属性集等，Apache读取证书私钥的标准，在JAVA平台中使用。（接入一些支付公司中经常会提供此格式的密钥，有些印象）</p>
+<h4 id="toc_12">PKCS#12：</h4>
+<p>描述个人信息交换语法标准。描述了将用户公钥、私钥、证书和其他相关信息打包的语法。 含有私钥，同时可以有公钥，有口令保护 格式一般为 <code>.pfx</code>。 由于它可以加密码保护，打开时需要一串特殊密码，所以相对安全些。</p>
+<h2 id="toc_13">证书和密钥文件格式</h2>
+<p>需要注意：证书文件格式与加密标准并没有严格的对应关系，证书文件格式是存储证书的方式不同，可能存储的内容也略有不同。而加密标准是使用证书文件进行加解密的方式不同。</p>
+<h4 id="toc_14">pem格式</h4>
+<p>最普通的证书格式，以<code>-----BEGIN CERTIFICATE-----</code> 开头，以<code>-----END CERTIFICATE-----</code>结尾；有些pem证书把私钥也放在了一个文件中，但是很多平台还是需求证书和私钥分开放在不同的文件中。 pem证书有以下特点：</p>
+<ul>
+    <li>base64编码；</li>
+    <li>有.pem, .crt, .cer, .key文件后缀；</li>
+    <li>Apache等类似服务器使用pem格式证书；</li>
+</ul>
+<h4 id="toc_15">der格式</h4>
+<p>der格式是pem格式证书的二进制格式，证书和私钥都可以以der格式存储。 其特点为：</p>
+<ul>
+    <li>二进制格式；</li>
+    <li>以.cer或.der格式为后缀；</li>
+    <li>常被用于java平台；</li>
+</ul>
+<h4 id="toc_16">PKCS#7格式</h4>
+<p>它是一种PKCS#7格式以<code>-----BEGIN PKCS-----</code>开头，以<code>-----END PKCS7-----</code>结尾，它只能保存证书或证书链，不能保存私钥。 其特点为：</p>
+<ul>
+    <li>base64编码；</li>
+    <li>文件后缀为 .p7p, .p7c；</li>
+    <li>window或java tomcat等平台支持此类型；</li>
+</ul>
+<h4 id="toc_17">PKCS#12（pfx）格式</h4>
+<p>它能把服务器证书（包括公钥），中间证书和私钥存储在一起。特点为：</p>
+<ul>
+    <li>二进制文档；</li>
+    <li>以 .pfx 或.p12为后缀；</li>
+    <li>经常在windows系统内被用于导入导出证书和私钥；</li>
+    <li>打开可能需要额外密码；</li>
+</ul>
+<h4 id="toc_18">密钥的保存</h4>
+<p>对于密钥（单指公私钥）的保存，并不需要特殊的格式，直接将base64编码后的密钥作为字符串存入文档即可。</p>
+<hr />
+<h1 id="toc_19">RSA加密操作</h1>
+<h2 id="toc_20">密钥生成和使用</h2>
+<div>
+<pre><code class="language-none">openssl genrsa -out rsa_private_key.pem 1024 // 生产一个1024位的私钥, 保存在 rsa_private_key.pem 文件里
+
+openssl rsa -in rsa_private_key.pem -pubout -out pub.pem  // 通过私钥生产公钥</code></pre>
+</div>
+<p>此外，介绍一下openssl提供的一个测试加密速度的小工具，可以查看一定时间内某算法计算的次数，让我们对各种加密算法的速度有一个大概的认识。</p>
+<div>
+<pre><code class="language-none">openssl speed algciper
+eg: openssl speed rsa1024
+    openssl speed des-ede3 </code></pre>
+</div>
+<h2 id="toc_21">格式转换</h2>
+<h4 id="toc_22">从pfx文件中提取公私钥</h4>
+<div>
+<pre><code class="language-none">openssl pkcs12 -in source.pfx -nocerts -nodes -out key.key // 从pfx文件中获取到密匙对文件，有时会需要密码
+opensll rsa -in key.key -out pri.key // 从密匙对文件中获取到私匙。
+opensll rsa -in key.key -pubout -out pub.key // 从密匙对文件中获取到公匙;
+openssl pkcs8 -in pri.key -out repri.key -outform der -nocrypt -topk8 //java语言用</code></pre>
+</div>
+<h4 id="toc_23">各种证书之间的互相转换</h4>
+<div>
+<pre><code class="language-none">PEM to DER
+openssl x509 -outform der -in certificate.pem -out certificate.der
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&ndash;
+PEM to P7B
+openssl crl2pkcs7 -nocrl -certfile certificate.cer -out certificate.p7b -certfile CAcert.cer
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-
+PEM to PFX
+openssl pkcs12 -export -out certificate.pfx -inkey privateKey.key -in certificate.crt -certfile CAcert.crt
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;
+DER to PEM
+openssl x509 -inform der -in certificate.cer -out certificate.pem
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;
+P7B to PEM
+openssl pkcs7 -print_certs -in certificate.p7b -out certificate.cer
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-
+P7B to PFX
+openssl pkcs7 -print_certs -in certificate.p7b -out certificate.cer
+openssl pkcs12 -export -in certificate.cer -inkey privateKey.key -out certificate.pfx -certfile CAcert.cer
+&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;-
+PFX to PEM
+openssl pkcs12 -in certificate.pfx -out certificate.cer -nodes</code></pre>
+</div>
+<h2 id="toc_24">PHP中使用RSA</h2>
+<p>作为一个PHPer,当然还要提一下在 PHP 中如何使用 RSA 加密，所用工具依然是强大的openssl扩展：</p>
+<div>
+<pre><code class="language-none"># 从pfx文件中提取私钥和证书(需要传入密码 $password)：
+    openssl_pkcs12_read($file_content, $key, $password);
+    $key['pkey'] =&gt; 私钥
+    $key['cert'] =&gt; 证书
+
+# 解析x.509证书
+    openssl_x509_read($cert);
+
+# 以pkcs7加密标准加解密/签名验签数据：需要注意pkcs7操作都需要使用一个临时文件，多进程时要考虑一下文件冲突问题，还有别忘了最后释放临时文件。
+    openssl_pkcs7_encrypt()/openssl_pkcs7_decrypt()
+    openssl_pkcs7_sign()/openssl_pkcs7_verify()
+
+# 从字符串中获取公私钥：
+    openssl_pkey_get_private()/openssl_pkey_get_public()
+
+# RSA以pkcs#12标准加解密/签名验签数据：
+    openssl_private(public)_encrypt()/openssl_private(public)_decrypt() </code></pre>
+</div>
+<hr />
+<h1 id="toc_25">小结</h1>
+<p>最后不得不吐槽一下各种不统一标准的支付公司，可能由于系统老，有各种各样的奇葩的加解密要求。。。 不像支付宝和微信这种大平台，纯纯的 RSA 操作，使用起来非常方便。希望跟我以前一样饱受加解密折磨，最后还一头雾水的看官能通过此文有所收获。</p>
+<p>随着硬件的快速发展，加解密带来的资源消耗已经越来越微不足道了，我相信不仅是金融等行业，对其他IT行业来说，加解密特别是非对称加密也一定会越来越重要，有备无患嘛。</p>
+<p>最后，如果您觉得此文对您稍有帮助，可以点击下方<strong>推荐</strong>。持续更新，欢迎<strong>关注</strong>。</p>
+<p>参考：</p>
+<p><a href="http://www.youdzone.com/signature.html">What is a Digital Signature?</a></p>
+<p><a href="https://www.sslshopper.com/ssl-converter.html">SSL Shopper</a></p>

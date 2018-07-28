@@ -1,0 +1,150 @@
+---
+layout: post
+title: "用C写一个web服务器（二） I/O多路复用之epoll"
+date: 2017-03-23 18:00:08 +0800
+comments: true
+---
+
+<h1 id="toc_0">前言</h1>
+<p>继续更新&ldquo;用 C 写一个 web 服务器&rdquo;项目（上期链接：<a href="http://www.cnblogs.com/zhenbianshu/p/6550511.html">用C写一个web服务器（一） 基础功能</a>），本次更新选择了 I/O 模型的优化，因为它是服务器的基础，这个先完成的话，后面的优化就可以选择各个模块来进行，不必进行全局化的改动了。</p>
+<h3 id="toc_1">I/O模型</h3>
+<p>接触过 socket 编程的同学应该都知道一些 I/O 模型的概念，linux 中有阻塞 I/O、非阻塞 I/O、I/O 多路复用、信号驱动 I/O 和 异步 I/O 五种模型。</p>
+<p>其他模型的具体概念这里不多介绍，只简单地提一下自己理解的 I/O 多路复用：简单的说就是由一个进程来管理多个 socket，即将多个 socket 放入一个表中，在其中有 socket 可操作时，通知进程来处理， I/O 多路复用的实现方式有 select、poll 和 epoll。</p>
+<h3 id="toc_2">select/poll/epoll</h3>
+<p>在 linux下，通过文件描述符（file descriptor, 下 fd）来进行 socket 的操作，所以下文均是对 fd 操作。</p>
+<p>首先说最开始实现的 select 的问题：</p>
+<ul>
+    <li>select 打开的 fd 最大数目有限制，一般为1024，在当前计算系统的并发量前显然有点不适用了。</li>
+    <li>select 在收到有 fd 可操作的通知时，是无法得知具体是哪个 fd 的，需要线性扫描 fd 表，效率较低。</li>
+    <li>当有 fd 可操作时，fd 会将 fd 表复制到内核来遍历，消耗也较大。</li>
+</ul>
+<p>随着网络技术的发展，出现了 poll：poll 相对于 select，使用 pollfd 表（链表实现） 来代替 fd，它没有上限，但受系统内存的限制，它同样使用 fd 遍历的方式，在并发高时效率仍然是一个问题。</p>
+<p>最终，epoll 在 Linux 2.6 的内核面世，它使用事件机制，在每一个 fd 上添加事件，当fd 的事件被触发时，会调用回调函数来处理对应的事件，epoll 的优势总之如下：</p>
+<ul>
+    <li>只关心活跃的 fd，精确定位，改变了poll的时间效率 O(n) 到 O(1);</li>
+    <li>fd 数量限制是系统能打开的最大文件数，会受系统内存和每个 fd 消耗内存的影响，以当前的系统硬件配置，并发数量绝对不是问题。</li>
+    <li>内核使用内存映射，大量 fd 向内核态的传输不再是问题。</li>
+</ul>
+<p>为了一步到位，也是为了学习最先进的I/O多路复用模型，直接使用了 epoll 机制，接下来介绍一下 epoll 相关基础和自己服务器的实现过程。</p>
+<hr />
+<h1 id="toc_3">epoll介绍</h1>
+<p>epoll 需要引入<code>&lt;sys/epoll.h&gt;</code>文件，首先介绍一下 epoll 系列函数：</p>
+<h3 id="toc_4">epoll_create</h3>
+<p><code>int epoll_create(int size);</code></p>
+<p>创建一个 epoll 实例，返回一个指向此 epoll 实例的文件描述符，当 epoll 实例不再使用时，需要使用<code>close()</code>方法来关闭它。</p>
+<p>在最初的实现中， <code>size</code> 作为期望打开的最大 fd 数传入，以便系统分配足够大的空间。在最新版本的内核中，系统内核动态分配内存，已不再需要此参数了，但为了避免程序运行在旧内核中会有问题，还是要求此值必须大于0；</p>
+<h3 id="toc_5">epoll_ctl</h3>
+<p><code>int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);</code></p>
+<ul>
+    <li>
+        <p>epfd 是通过 epoll_create 返回的文件描述符</p>
+    </li>
+    <li>
+        <p>op 则是文件描述符监听事件的操作方式，<code>EPOLL_CTL_ADD/EPOLL_CTL_MOD/EPOLL_CTL_DEL</code> 分别表示添加、修改和删除一个监听事件。</p>
+    </li>
+    <li>
+        <p>fd 为要监听的文件描述符。</p>
+    </li>
+    <li>
+        <p>event 为要监听的事件，可选事件和行为会在下面描述，它的结构如下：</p>
+    </li>
+</ul>
+<div>
+<pre><code class="language-none">typedef union epoll_data {
+               void        *ptr;
+               int          fd;
+               uint32_t     u32;
+               uint64_t     u64;
+           } epoll_data_t;
+
+           struct epoll_event {
+               uint32_t     events;      /* epoll事件 */
+               epoll_data_t data;        /* 事件相关数据 */
+           };</code></pre>
+</div>
+<h3 id="toc_6">epoll_wait</h3>
+<p><code>int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);</code> 监听 epoll 事件：</p>
+<ul>
+    <li>events 是 epoll 事件数组，epoll 事件的结构上面已经介绍过。</li>
+    <li>maxevents 是一次监听获取到的最大事件数目。</li>
+    <li>timeout 是一次监听中获取不到事件的最长等待时间，设置成 -1 会一直阻塞等待，0 则会立即返回。</li>
+</ul>
+<h3 id="toc_7">epoll行为</h3>
+<p>在 epoll_ctl 的 event 参数中，事件 events 有如下可选项：</p>
+<p>EPOLLIN（可读）、EPOLLOUT（可写）、EPOLLRDHUP（连接关闭）、EPOLLPRI（紧急数据可读），此外 EPOLLERR（错误），EPOLLHUP（连接挂断）事件会被 epoll 默认一直监听。</p>
+<p>除了设置事件外，还可以对监听的行为设置：</p>
+<ul>
+    <li>level trigger：此行为被 epoll 默认支持，不必设置。在 epoll_wait 得到一个事件时，如果应用程序不处理此事件，在 level trigger 模式下，epoll_wait 会持续触发此事件，直到事件被程序处理；</li>
+    <li>EPOLLET(edge trigger)：在 edge trigger 模式下，事件只会被 epoll_wait 触发一次，如果用户不处理此事件，不会在下次 epoll_wait 再次触发。在处理得当的情况下，此模式无疑是高效的。需要注意的是此模式需求 socket 处理非阻塞模式，下面会实现此模式。</li>
+    <li>EPOLLONESHOT：在单次命中模式下，对同一个文件描述符来说，同类型的事件只会被触发一次，若想重复触发，需要重新给文件描述符注册事件。</li>
+    <li>EPOLLWAKEUP：3.5版本加入，如果设置了单次命中和ET模式，而且进程有休眠唤醒能力，当事件被挂起和处理时，此选项确保系统不进入暂停或休眠状态。 事件被 epoll_wait 调起后，直到下次 epoll<em>_</em>wait 再次调起此事件、文件描述符被关闭，事件被注销或修改，都会被认为是处于处理中状态。</li>
+    <li>EPOLLEXCLUSIVE：4.5版本加入，为一个关联到目标文件描述符的 epoll 句柄设置独占唤醒模式。如果目标文件描述符被关联到多个 epoll 句柄，当有唤醒事件发生时，默认所有 epoll 句柄都会被唤醒。而都设置此标识后，epoll 句柄之一被唤醒,以避免&ldquo;惊群&rdquo;现象。</li>
+</ul>
+<p>当监听事件和行为需求同时设置时，使用运算符 <code>|</code>即可。</p>
+<hr />
+<h1 id="toc_8">代码实现</h1>
+<h3 id="toc_9">整体处理逻辑</h3>
+<p>使用 epoll 时的服务器受理客户端请求逻辑如下：</p>
+<ol>
+    <li>创建服务器 socket，注册服务器 socket 读事件；</li>
+    <li>客户端连接服务器，触发服务器 socket 可读，服务器创建客户端 socket，注册客户端socket 读事件；</li>
+    <li>客户端发送数据，触发客户端 socket 可读，服务器读取客户端信息，将响应写入 socket；</li>
+    <li>客户端关闭连接，触发客户端 socket 可读，服务器读取客户端信息为空，注销客户端 socket 读事件；</li>
+</ol>
+<p>代码实现如下（详细处理方式见 GitHub：<a href="https://github.com/zhenbianshu/tinyServer" target="_blank">我是地址</a>）：</p>
+<div>
+<pre><code class="language-none">erver_fd = server_start();
+    epoll_fd = epoll_create(FD_SIZE);
+    epoll_register(epoll_fd, server_fd, EPOLLIN|EPOLLET);// 这里注册socketEPOLL事件为ET模式
+
+    while (1) {
+        event_num = epoll_wait(epoll_fd, events, MAX_EVENTS, 0);
+        for (i = 0; i &lt; event_num; i++) {
+            fd = events[i].data.fd;
+            // 如果是服务器socket可读，则处理连接请求
+            if ((fd == server_fd) &amp;&amp; (events[i].events == EPOLLIN)){
+                accept_client(server_fd, epoll_fd);
+            // 如果是客户端socket可读，则获取请求信息，响应客户端
+            } else if (events[i].events == EPOLLIN){
+                deal_client(fd, epoll_fd);
+            } else if (events[i].events == EPOLLOUT)
+                // todo 数据过大，缓冲区不足的情况待处理
+                continue;
+        }
+    }</code></pre>
+</div>
+<p>需要注意的是，客户端socket在可读之后也是立刻可写的，我这里直接读取一次请求，然后将响应信息 write 进去，没有考虑读数据时缓冲区满的问题。</p>
+<p>这里提出的解决方案为：</p>
+<ol>
+    <li>设置一个客户端 socket 和 buffer 的哈希表；</li>
+    <li>在读入一次信息缓冲区满时 recv 会返回 <code>EAGIN</code> 错误，这时将数据放入 buffer，暂时不响应。</li>
+    <li>后续读事件中读取到数据尾后，再注册 socket 可写事件。</li>
+    <li>在处理可写事件时，读取 buffer 内的全部请求内容，处理完毕后响应给客户端。</li>
+    <li>最后注销 socket 写事件。</li>
+</ol>
+<h3 id="toc_10">设置epoll ET（edge trigger）模式</h3>
+<p>上文说过，ET模式是 epoll 的高效模式，事件只会通知一次，但处理良好的情况下会更适用于高并发。它需要 socket 在非阻塞模式下才可用，这里我们实现它。</p>
+<div>
+<pre><code class="language-none">sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    // 获取服务器socket的设置，并添加"不阻塞"选项
+    flags = fcntl(sock_fd, F_GETFL, 0);
+    fcntl(sock_fd, F_SETFL, flags|O_NONBLOCK);
+
+    .....
+    // 这里注册服务器socket EPOLL事件为ET模式
+    epoll_register(epoll_fd, server_fd, EPOLLIN|EPOLLET);
+</code></pre>
+</div>
+<p>我将处理事件注掉后使用一次客户端连接请求进行了测试，很清晰地说明了 ET模式下，事件只触发一次的现象，前后对比图如下：</p>
+<p><img src="/images/819496-20170323192954924-108654499.png" alt="" /></p>
+<p><img src="/images/819496-20170323193015268-2066239300.png" alt="" /></p>
+<hr />
+<h1 id="toc_11">小结</h1>
+<p>Mac OS X 操作系统的某些部分是基于 FreeBSD 的，FreeBSD 不支持，MAC 也不支持（不过有相似的 kqueue），跑到开发机上开发的，作为一个最基础的 C learner, 靠着<code>printf()</code>和<code>fflush()</code>两个函数来调试的，不过搞了很久总算是完成了，有用 C 的前辈推荐一下调试方式就最好了。。</p>
+<p>另外 epoll 在最新的内核中也更新了些内容，旧的很多博客都没有提到，话说照这样的发展速度，我这篇也会在一段时间后&ldquo;过时&rdquo;吧，哈哈~</p>
+<p>如果您觉得本文对您有帮助，可以点击下面的 <strong><em>推荐</em></strong> 支持一下我。博客一直在更新，欢迎 <strong><em>关注</em></strong> 。</p>
+<p>参考：</p>
+<p><a href="http://www.cnblogs.com/Anker/archive/2013/08/17/3263780.html">IO多路复用之epoll总结</a></p>
+<p><a href="http://www.cnblogs.com/OnlyXP/archive/2007/08/10/851222.html">epoll精髓</a></p>
+<p><a href="http://man7.org/linux/man-pages/man7/epoll.7.html">epoll interface detail</a> （很不错的英文文档，推荐）</p>

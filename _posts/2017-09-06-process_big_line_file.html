@@ -1,0 +1,100 @@
+---
+layout: post
+title: "扩充你的工具箱 - 大行文件的处理"
+date: 2017-09-06 18:00:08 +0800
+comments: true
+---
+
+<h1 id="toc_0">前言</h1>
+<p>接上篇 <a href="http://www.cnblogs.com/zhenbianshu/p/7406572.html">设计模式，Let's &ldquo;Go&rdquo;！ (上)</a>， 继续更新设计模式，今天介绍的设计模式有模板模式、迭代器模式、组合模式、状态模式、代理模式、桥接模式和建造者模式；</p>
+<p>文章对设计模式的特点和使用场景进行了总结，每个设计模式分配的篇幅较少，给了解过设计模式的作为速查，帮不了解设计模式的入门， 当然具体实现才是重点，使用现实生活中的事物例子来帮助理解设计模式。</p>
+<p>放上 Go 实现设计模式的源码地址：<a href="https://github.com/zhenbianshu/DesignPattern">DesignPattern-枕边书-Github</a> ，偶有更新，欢迎 <code>star</code>。</p>
+<p>文章经常被人爬，而且还不注明原地址，我在这里的更新和纠错没法同步，这里注明一下原文地址：http://www.cnblogs.com/zhenbianshu/p/7449868.html 以防误人子弟。</p>
+<hr />
+<h1 id="toc_1">模板模式(Template)</h1>
+<h3 id="toc_2">介绍</h3>
+<p>模板模式：模板模式在<code>抽象类或父类</code>中抽象出<code>算法步骤</code>作为模板，模板的具体细节推迟到子类实现。</p>
+<ul>
+    <li>模板模式在父类或抽象类中定义一个<code>算法的骨架</code>，并在父类或抽象类中实现共同的部分，各个不同的步骤由不同的子类分别实现；</li>
+    <li>模板板式在父类的算法步骤中定义<code>勾子(hook)</code>，在子类中判断并定义一些不是非通用步骤；</li>
+    <li>模板模式与策略模式的不同之处在于，策略模式是针对多个不同的算法，而模板模式是针对一个算法的不同步骤，在模板模式中，只有一个算法；</li>
+</ul>
+<h3 id=>场景</h3>
+<ul>
+    <li>多个算法有多个共同之处，但某些步骤略微不同；</li>
+    <li>各子类步骤顺<p><span style="font-size: 25.5px; font-weight: bold; text-align: left;">前言</span></p>
+        <p>前几天，从 DBA 手里接到一个 Redis RDB 文件，里面是 15G 约 660万 的 Redis 键值对数据，想通过这些数据提取出当前 Redis 的 Key 和这些 Key 的类型。其文件的每行结构类似于:</p>
+        <p><code>KEY: IAmATestKey || TYPE: STRING || expiretime:-1 || value:IAmTheTestValue</code></p>
+        <p>下文就是此问题的跳坑和脱坑过程：</p>
+        <p>文章经常被人爬，而且还不注明原地址，我在这里的更新和纠错没法同步，这里注明一下原文地址：http://www.cnblogs.com/zhenbianshu/p/7486530.html 以防误人子弟。</p>
+        <hr />
+        <h1 id=>通用解决方案不好使</h1>
+        <h3 id=>awk长时间处理中</h3>
+        <p>对 linux 命令稍熟悉的同学可能就会说了：这些数据格式这么统一，数据字段间也有明显的分隔符，不正是 <code>awk</code> 工具大显身手的时刻吗？</p>
+        <p>是的，<code>awk</code> 是 linux 下一个强大而又略复杂的命令，使用它的简单语句也可以高效地处理大量文本，但是今天的主角不是它，我也不想复制粘贴网上到处都是的教程，就不再多介绍了。</p>
+        <p>原以为使用 <code>awk -F ' ' '{printf $2","$6}' rdb.log &gt;&gt;keys.txt</code> 将结果重定向到 <code>keys.txt</code>，也就一行命令的事，可是执行后，发现执行了两个小时还没有结束的意思。</p>
+        <p>是文件太大，awk 卡住了么？</p>
+        <h3 id="toc_3">切割文件也无法解决</h3>
+        <p>文件太大处理不方便，这时，就要用到linux的另一个工具了：<code>split</code> 将文件以<code>行数/大小</code>平均分割； <code>split [-b bytes][-l line] input_file output_prefix</code></p>
+        <p>由于每一行的大小是不同的，按照大小来分割的话可能会导致某一行被拆散，于是以每个文件 100 万行，分割出7个文件，再对这些文件分别使用 <code>awk</code> 来处理， <code>split -l 1000000 rdb.log rdb_split_</code></p>
+        <p>对分割后的文件使用awk，结果奇怪的是还是会在某个文件上执行很长时间没反应。</p>
+        <p>这时使用 ls 命令查看文件大小的时候发现，15G 的文件分割成了 7 份，有一个竟然有 7G 大小，这时想到可能会有的 set 或 list 很大，占用几 G 的内存也是有可能的。而 awk 长时间处理有可能是因为这些特别大的行。</p>
+        <hr />
+        <h1 id="toc_4">用C来高效处理</h1>
+        <p>既然如此，那就只好用别的方法先处理一下文件了，这里我考虑取出文件数据每行的前100个字符，由于键都很短，100个字符已经是足够包括键名和类型了。</p>
+        <p>可是印象中没有相关的工具或命令，于是找谷哥搜索一下文件的大行怎么处理。。。结果并没有相应的解决方式，只好考虑自己来写脚本了，由于其逻辑并不复杂，而且对效率要求高，就舍弃了 PHP，准备使用 C 来解决。</p>
+        <p>整体思想是：利用 C 文件操作函数 <code>fgets(&amp;res, length, file_hanler)</code> 在每一行读到换行符或读到 length 个字符的特点。如果读到100个字符还没有读到结尾（最后一个字符不是换行符），就说明此行是一个大行，那么就读取单个字符并丢弃，直到读到换行符，再继续处理下一行。</p>
+        <p>这里贴上 C 脚本：</p>
+        <div>
+<pre class="line-numbers"><code class="language-none">#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+
+int main() {
+    FILE *fp_in;
+    FILE *fp_out;
+    char ch;
+    char line[100];
+
+    fp_in = fopen("rdb.log", "r");
+    fp_out = fopen("keys.txt", "w");
+
+    while (!feof(fp_in)) {
+        fgets(line, 100, fp_in);  //读取一行
+        fputs(line, fp_out);
+
+        if (line[strlen(line) - 1] != '\n') {
+            while ((ch = fgetc(fp_in)) != '\n') {
+                ;
+            }
+            fputc('\n', fp_out);
+        }
+    }
+    fclose(fp_in);
+    fclose(fp_out);
+}</code></pre>
+        </div>
+        <p>C 执行得还是很快的，大概三分钟。执行结束后，再使用 awk 工具，果然很快就把键和类型拆了出来。</p>
+        <p>此时心情大好，果然多掌握一门像 C 这种高效语言就是有用啊。</p>
+        <hr />
+        <h1 id="toc_5">还有更好的工具</h1>
+        <p>当从 leader 口中得知 cut 命令时，我的表情是这样的：</p>
+        <p><img src="/images/819496-20170906192900319-1519659973.png" alt="" /></p>
+        <p>好吧，赶快了解一下 cut 命令：</p>
+        <p><code>cut [options] [file.name]</code> :从每个文件中输出指定部分到标准输出。</p>
+        <p>其选项有：</p>
+        <ul>
+            <li><code>-b n</code> 输出第n个字节；</li>
+            <li><code>-c n</code> 输出第n个字符，用于处理类似utf-8中文这种三个字节的字符；</li>
+            <li><code>-f n</code> 输出第n个字段，其字段分隔符用 <code>-d</code> 指定；</li>
+        </ul>
+        <p>不光有我脚本取前 n 个字符的功能，还能直接取第 n 个字段。。</p>
+        <p>试了下，<code>cut -b 100 rdb.log &gt;&gt;keys.log</code> 取前 100 个字符用了 8 分钟，虽然比 C 脚本要慢，可是它不用手写脚本，而且适用范围比我写的脚本要大。</p>
+        <hr />
+        <h1 id="toc_6">小结</h1>
+        <p>问题是顺利解决了，可是解决过程引起我的思考。这个问题应该会被更快更方便地解决的，搞得这么麻烦主要是因为 <code>linux命令掌握不全</code>。</p>
+        <p>不知道 linux 还有 cut 命令。其实也不是不知道，事后发现我笔记里已经有了关于 cut 的简单记录了，可能是由于命令太过简单，没有很多参数，也没想到太多应用场景，被我记入了 linux 的杂项。</p>
+        <p>同时也发现了跟 cut 一样被遗忘的还有其他小知识点，是时候回忆一波了。</p>
+        <p>另外谷哥搜索命令的关键词也大有问题，没有抓住取文件前 n 字符的本质，竟然去搜索文件大行处理，因为急着要下班去接女朋友，失了智了，最后一个弥补工具问题的机会被抛弃了。</p>
+        <p>我一直认为：<code>解决问题的能力 ~ 个人工具箱的大小</code>。掌握的工具越多，面对问题就会有更多选择，解决问题也就越得心应手。开发技能是基础，工具用好才能快速高效地解决问题。</p>
+        <p>写几个常用自动化脚本、<code>alias</code> 简化一下很长的命令、掌握一些常用的快捷键，开发效率就能这么一点点提升了。</p>
+        <p>关于本文有什么问题可以在下面留言交流，如果您觉得本文对您有帮助，可以点击下面的 <strong>推荐</strong> 支持一下我。博客一直在更新，欢迎 <strong>关注</strong> 。</p>

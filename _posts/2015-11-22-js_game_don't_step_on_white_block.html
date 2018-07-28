@@ -1,0 +1,253 @@
+---
+layout: post
+title: "JS实现别踩白块小游戏"
+date: 2015-11-22 18:00:08 +0800
+comments: true
+---
+
+<p>最近有朋友找我用JS帮忙仿做一个别踩白块的小游戏程序，但他给的源代码较麻烦，而且没有注释，理解起来很无力，我就以自己的想法自己做了这个小游戏，主要是应用JS对DOM和数组的操作。</p>
+<hr />
+<p>&nbsp;</p>
+<p><img src="/images/819496-20151122083048515-1403728123.jpg" alt="" /></p>
+<p>程序思路：如图：将游戏区域的CSS设置为相对定位、溢出隐藏;两块&ldquo;游戏板&rdquo;上分别排布着24块方格，黑色每行随机产生一个，&ldquo;游戏板&rdquo;向下滚动并交替显示，将每个操作板的黑块位置存入数组，每次点击时将数组pop出来进行比对（我觉得亮点在这&hellip;&hellip;）。</p>
+<p>这里是游戏的GitHub地址，大家可以到里点击中部菜单最右边的的Download&nbsp;ZIP按钮下载到桌面一试，HTML和JS，无需服务器。</p>
+<p><span style="font-family: 'Microsoft YaHei'; color: #ff0000;"><a style="color: #ff0000;" href="https://github.com/zhenbianshu/bcbk">下载地址</a></span></p>
+<p>以下是具体实现，关键部分有注释。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">HTML部分:</span></strong></p>
+<p>&nbsp;</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">&lt;!</span><span style="color: #ff00ff;">DOCTYPE html</span><span style="color: #0000ff;">&gt;</span>
+
+<span style="color: #0000ff;">&lt;</span><span style="color: #800000;">html</span><span style="color: #0000ff;">&gt;</span>
+
+<span style="color: #0000ff;">&lt;</span><span style="color: #800000;">head</span><span style="color: #0000ff;">&gt;</span><span style="color: #0000ff;">&lt;</span><span style="color: #800000;">title</span><span style="color: #0000ff;">&gt;</span>别踩白块<span style="color: #0000ff;">&lt;/</span><span style="color: #800000;">title</span><span style="color: #0000ff;">&gt;</span><span style="color: #0000ff;">&lt;/</span><span style="color: #800000;">head</span><span style="color: #0000ff;">&gt;</span>
+
+<span style="color: #0000ff;">&lt;</span><span style="color: #800000;">body</span><span style="color: #0000ff;">&gt;</span>
+
+<span style="color: #0000ff;">&lt;</span><span style="color: #800000;">div </span><span style="color: #ff0000;">id</span><span style="color: #0000ff;">="gameZone"</span><span style="color: #0000ff;">&gt;&lt;</span><span style="color: #800000;">div </span><span style="color: #ff0000;">id</span><span style="color: #0000ff;">="boardb"</span><span style="color: #ff0000;"> style</span><span style="color: #0000ff;">="position: absolute;top: 0px;"</span><span style="color: #0000ff;">&gt;&lt;/</span><span style="color: #800000;">div</span><span style="color: #0000ff;">&gt;&lt;/</span><span style="color: #800000;">div</span><span style="color: #0000ff;">&gt;</span><span style="color: #000000;">//初始化一个boardb,使ab同时存在
+
+</span><span style="color: #0000ff;">&lt;/</span><span style="color: #800000;">body</span><span style="color: #0000ff;">&gt;</span>
+
+<span style="color: #0000ff;">&lt;/</span><span style="color: #800000;">html</span><span style="color: #0000ff;">&gt;</span></pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<hr />
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">CSS部分：</span></strong></p>
+<div class="cnblogs_code">
+<pre><span style="color: #800000;">*</span>{<span style="color: #ff0000;">margin</span>:<span style="color: #0000ff;"> 0px</span>;<span style="color: #ff0000;">padding</span>:<span style="color: #0000ff;"> 0px</span>;<span style="color: #ff0000;">box-sizing</span>:<span style="color: #0000ff;"> border-box</span>;}<span style="color: #800000;">  //简单的reset一下,并用box-sizing设置盒子尺寸将边框也计算进去,便于后面计算小方块位置
+
+#gameZone</span>{<span style="color: #ff0000;">width</span>:<span style="color: #0000ff;"> 302px</span>;<span style="color: #ff0000;">height</span>:<span style="color: #0000ff;"> 602px</span>;<span style="color: #ff0000;">border</span>:<span style="color: #0000ff;"> 1px solid green</span>;<span style="color: #ff0000;">margin</span>:<span style="color: #0000ff;"> 20px auto</span>;<span style="color: #ff0000;">position</span>:<span style="color: #0000ff;"> relative</span>;<span style="color: #ff0000;">overflow</span>:<span style="color: #0000ff;"> hidden</span>;}<span style="color: #800000;"> //游戏区域，多两个像素是为了除去边框外还有足够的300*600的空间
+
+.square</span>{<span style="color: #ff0000;">width</span>:<span style="color: #0000ff;"> 75px</span>;<span style="color: #ff0000;">height</span>:<span style="color: #0000ff;"> 100px</span>;<span style="color: #ff0000;">float</span>:<span style="color: #0000ff;"> left</span>;<span style="color: #ff0000;">border</span>:<span style="color: #0000ff;"> 1px solid black</span>;}<span style="color: #800000;">
+
+.squareBlack</span>{<span style="color: #ff0000;">width</span>:<span style="color: #0000ff;"> 75px</span>;<span style="color: #ff0000;">height</span>:<span style="color: #0000ff;"> 100px</span>;<span style="color: #ff0000;">border</span>:<span style="color: #0000ff;"> 1px solid black</span>;<span style="color: #ff0000;">float</span>:<span style="color: #0000ff;"> left</span>;<span style="color: #ff0000;">background</span>:<span style="color: #0000ff;"> black</span>;}<span style="color: #800000;">//每个小方块为75*100，并且设置黑色小方块的背景色。</span></pre>
+</div>
+<p>&nbsp;</p>
+<hr />
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">JS部分：</span></strong></p>
+<p>&nbsp;这里分函数介绍：</p>
+<p><strong><span style="font-size: 14pt;">全局变量初始化</span></strong></p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">var</span> loc=600;<span style="color: #008000;">//</span><span style="color: #008000;">黑块落地失败判定</span>
+
+<span style="color: #0000ff;">var</span> count=0;<span style="color: #008000;">//</span><span style="color: #008000;">初始化击中黑块总数</span>
+
+<span style="color: #0000ff;">var</span> locArr=[];<span style="color: #008000;">//</span><span style="color: #008000;">初始化游戏板上黑块位置的</span>
+
+<span style="color: #0000ff;">var</span> order=(<span style="color: #0000ff;">function</span><span style="color: #000000;">(){
+
+　　　　</span><span style="color: #0000ff;">var</span> ord="A"<span style="color: #000000;">;
+
+　　　　</span><span style="color: #0000ff;">return</span> <span style="color: #0000ff;">function</span><span style="color: #000000;">(){
+
+　　　　</span><span style="color: #0000ff;">if</span>(ord=='boarda')ord='boardb'<span style="color: #000000;">;
+
+　　　　</span><span style="color: #0000ff;">else</span> ord='boarda'<span style="color: #000000;">;
+
+　　　　</span><span style="color: #0000ff;">return</span><span style="color: #000000;"> ord;
+
+}
+
+})()</span><span style="color: #008000;">//</span><span style="color: #008000;">用闭包函数使每次创建的游戏板的ID为boarda与boardb，其实用一个全局变量也行，不过为了有点逼格。。。</span>
+
+ </pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-family: 宋体;"><strong><span style="font-size: 14pt;">每次点击判定结果的函数</span></strong></span></p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">function</span><span style="color: #000000;"> judge(){
+
+　　　　</span><span style="color: #0000ff;">var</span> num=<span style="color: #0000ff;">this</span>.id.substr(3)<span style="color: #008000;">//</span><span style="color: #008000;">获取元素的ID号</span>
+
+　　　　<span style="color: #0000ff;">if</span>(num!=locArr.pop()){  <span style="color: #008000;">//</span><span style="color: #008000;">与位置数组pop出的对比</span>
+<span style="color: #000000;">
+　　　　　　　　clearTimeout(timer);
+
+　　　　　　　　alert(</span>"你的得分为："+count+"分！"<span style="color: #000000;">);
+
+　　　　　　　　</span><span style="color: #0000ff;">return</span>;  <span style="color: #008000;">//</span><span style="color: #008000;">失败清除定时器，结算分数。</span>
+<span style="color: #000000;">
+　　　　}</span><span style="color: #0000ff;">else</span><span style="color: #000000;">{
+
+　　　　　　　　loc</span>+=100<span style="color: #000000;">;
+
+　　　　　　　　</span><span style="color: #0000ff;">this</span>.style.background="silver"<span style="color: #000000;">;
+
+　　　　　　　　count</span>+=1;<span style="color: #008000;">//</span><span style="color: #008000;">成功将落地标志加方格的高度，将方格背景色改变一下，击中数+1</span>
+<span style="color: #000000;">
+　　　　}
+
+　　　　</span><span style="color: #0000ff;">if</span>(count!=0&amp;&amp;count%15==0<span style="color: #000000;">){
+
+　　　　　　　　clearTimeout(timer);
+
+　　　　　　　　newtimer</span>=50-count/15*5;
+<span style="color: #000000;">
+　　　　　　　　timer</span>=setInterval('fall()'<span style="color: #000000;">,newtimer);
+
+　　　　}</span><span style="color: #008000;">//</span><span style="color: #008000;">每击中15个后将速度加快一点，这个式子可自行定义。</span>
+<span style="color: #000000;">
+}</span></pre>
+</div>
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 14pt;">产生大框中小黑框位置的随机数，每次创建游戏板时调用此函数，根据产生数定义小黑块的位置</span></strong></p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">function</span><span style="color: #000000;"> generateRand(){
+
+　　　　</span><span style="color: #0000ff;">var</span> numArr=<span style="color: #000000;">[];
+
+　　　　</span><span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">var</span> j=0;j&lt;6;j++<span style="color: #000000;">){
+
+　　　　　　　　</span><span style="color: #0000ff;">var</span> num=Math.floor(Math.random()*4)+j*4<span style="color: #000000;">;
+
+　　　　　　　　numArr.push(num);
+
+　　　　}
+
+　　　　</span><span style="color: #0000ff;">return</span><span style="color: #000000;"> numArr;
+
+}</span></pre>
+</div>
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 14pt;">每次调用在游戏区域的上方生成一个待往下滚动的游戏板，并将其黑色的部分的数字PUSH进locArr中</span></strong></p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">function</span><span style="color: #000000;"> drawBoard(){
+
+　　　　</span><span style="color: #0000ff;">var</span> temArr=generateRand();<span style="color: #008000;">//</span><span style="color: #008000;">这里应用一个临时的位置数组，为了防止两块游戏板之间的位置冲突。</span>
+<span style="color: #000000;">
+　　　　locArr</span>=temArr.concat(locArr);<span style="color: #008000;">//</span><span style="color: #008000;">将临时数组相连到全局位置数组中</span>
+
+　　　　<span style="color: #0000ff;">var</span> board=document.createElement('div'<span style="color: #000000;">);
+
+　　　　board.setAttribute(</span>'id'<span style="color: #000000;">,order());
+
+　　　　board.style.position</span>="absolute"<span style="color: #000000;">;
+
+　　　　board.style.top</span>='-600px'<span style="color: #000000;">;
+
+　　　　</span><span style="color: #0000ff;">for</span>(<span style="color: #0000ff;">var</span> i=0;i&lt;24;i++<span style="color: #000000;">){
+
+　　　　　　　　</span><span style="color: #0000ff;">var</span> ele=document.createElement('div'<span style="color: #000000;">);
+
+　　　　　　　　ele.setAttribute(</span>'id',"ele"+<span style="color: #000000;">i);
+
+　　　　　　　　</span><span style="color: #0000ff;">if</span>(temArr.indexOf(i)&gt;-1){   <span style="color: #008000;">//</span><span style="color: #008000;">判断当前创建的小方块的ID序列是否属于临时位置数组</span>
+<span style="color: #000000;">
+　　　　　　　　　　　　ele.setAttribute(</span>'class','squareBlack'<span style="color: #000000;">)
+
+　　　　　　　　}</span><span style="color: #0000ff;">else</span><span style="color: #000000;">{
+
+　　　　　　　　　　　　ele.setAttribute(</span>'class','square'<span style="color: #000000;">);
+
+　　　　　　　　}
+
+　　　　　　　　ele.addEventListener(</span>'click',judge,<span style="color: #0000ff;">false</span>); <span style="color: #008000;">//</span><span style="color: #008000;">给每一个小方格添加点击判定函数judge</span>
+<span style="color: #000000;">
+　　　　　　　　board.appendChild(ele);
+
+　　　　}
+
+　　　　</span><span style="color: #0000ff;">var</span> gameZone=document.getElementById('gameZone'<span style="color: #000000;">);
+
+　　　　gameZone.appendChild(board);
+
+}</span></pre>
+</div>
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 14pt;">找到脚本中存在的两个游戏板，使其往下滚动</span></strong></p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">function</span><span style="color: #000000;"> fall(){
+
+　　　　gameZone</span>=document.getElementById('gameZone'<span style="color: #000000;">);
+
+　　　　</span><span style="color: #0000ff;">var</span> boarda=document.getElementById('boarda');<span style="color: #008000;">//</span><span style="color: #008000;">因为ab两个游戏板全局一直存在，所以不需要定义找不到时的逻辑<br /></span>
+　　　　<span style="color: #0000ff;">var</span> anowtop=parseInt(boarda.style.top);<span style="color: #008000;">//</span><span style="color: #008000;">因为获取到的top位置是xxxpx类型，所以用一个parseInt()将其转换为整数便于处理。</span>
+
+　　　　<span style="color: #0000ff;">if</span>(anowtop==595){  <span style="color: #008000;">//</span><span style="color: #008000;">这里数目为595而不是600是因为在这一帧删除后，下一帧正好600px，刚好使两块游戏板衔接完好。</span>
+<span style="color: #000000;">
+　　　　　　　　gameZone.removeChild(boarda);
+
+　　　　　　　　drawBoard();</span><span style="color: #008000;">//</span><span style="color: #008000;">删除游戏区域的游戏板，并在最上方新生成一个。</span>
+<span style="color: #000000;">
+　　　　}
+
+　　　　anowtop</span>+=5<span style="color: #000000;">;
+
+　　　　boarda.style.top</span>=anowtop+"px"<span style="color: #000000;">;
+
+　　　　</span><span style="color: #0000ff;">var</span> boardb=document.getElementById('boardb'<span style="color: #000000;">);
+
+　　　　</span><span style="color: #0000ff;">var</span> bnowtop=<span style="color: #000000;">parseInt(boardb.style.top);
+
+　　　　</span><span style="color: #0000ff;">if</span>(bnowtop==595<span style="color: #000000;">){
+
+　　　　　　　　gameZone.removeChild(boardb);
+
+　　　　　　　　drawBoard();
+
+　　　　}
+
+　　　　bnowtop</span>+=5<span style="color: #000000;">;
+
+　　　　boardb.style.top</span>=bnowtop+"px"<span style="color: #000000;">;
+
+　　　　loc</span>-=5<span style="color: #000000;">;
+
+　　　　</span><span style="color: #0000ff;">if</span>(loc==0<span style="color: #000000;">){
+
+　　　　　　　　clearTimeout(timer);
+
+　　　　　　　　alert(</span>"你的得分为："+count+"分！"<span style="color: #000000;">);
+
+　　　　　　　　</span><span style="color: #0000ff;">return</span><span style="color: #000000;">;
+
+　　　　} </span><span style="color: #008000;">//</span><span style="color: #008000;">每一帧将落地判定减5，当落地判定为0时表示落地，结算分数。</span>
+<span style="color: #000000;">
+}</span></pre>
+</div>
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 14pt;">将主体调用写在window.onload函数里，使得页面的游戏区域加载完成后再调用函数。</span></strong></p>
+<div class="cnblogs_code">
+<pre>window.onload=<span style="color: #0000ff;">function</span><span style="color: #000000;">(){
+
+　　　　drawBoard();
+
+　　　　fall();
+
+　　　　</span>timer=setInterval('fall()',50<span style="color: #000000;">);
+
+}</span></pre>
+</div>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<hr />
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">游戏扩展:</span></strong></p>
+<p>增加页面UI：因为一开始的HTML特别简单，所以UI也很好修改，设置按钮，点击触发开始函数。</p>
+<p>改变游戏难度：修改setInterval的值，也可以对judge函数内的间隔数目进行修改，或将下落加速的表达式优化一下。</p>
+<p>增加比分排行等：用ajax连接服务器，在游戏结束后将结果写入数据库，并引用数据中的排行榜。</p>
+<p>改为街机模式：去除定时，修改judge函数，使其每次点击游戏板下落一个小方格的高度。设置总数，开始计时，结束计时。</p>
+<p>&nbsp;</p>
+<p>如果您觉得本博文对您有帮助，您可以推荐或关注我，如果您有什么问题，可以在下方留言讨论，谢谢。</p>

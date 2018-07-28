@@ -1,0 +1,147 @@
+---
+layout: post
+title: "使用PostgreSQL进行中文全文检索"
+date: 2017-11-06 18:00:06 +0800
+comments: true
+---
+
+<h1 id="toc_0">前言</h1>
+<p>PostgreSQL 被称为是&ldquo;最高级的开源数据库&rdquo;，它的数据类型非常丰富，用它来解决一些比较偏门的需求非常适合。</p>
+<p>前些天将 POI 点关键词查询的功能迁到了 PgSQL，总算对前文 <a href="http://www.cnblogs.com/zhenbianshu/p/6817569.html">空间索引 - 各数据库空间索引使用报告</a> 有了一个交代。</p>
+<p>由于 PgSQL 国内的资料较少，迁移过程踩了不少坑，这里总结记录一下，帮助后来的同学能顺利使用 PgSQL。而且目前在灰度测试刚布了一台机器，后续可能还要添加机器，整理一下流程总是好的。</p>
+<p>文章经常被人爬，而且还不注明原地址，我在这里的更新和纠错没法同步，这里注明一下原文地址：http://www.cnblogs.com/zhenbianshu/p/7795247.html</p>
+<hr />
+<h1 id="toc_1">开始</h1>
+<h3 id="toc_2">安装</h3>
+<p>首先是安装 PgSQL，这里我使用的是 PgSQL 9.6，PgSQL 10 也刚发布了，有兴趣的可以尝下鲜。</p>
+<p>PgSQL 的安装可以说非常复杂了，除了要安装 Server 和 Client 外，还需要安装 devel 包。为了实现空间索引功能，我们还要安装最重要的 PostGIS 插件，此插件需要很多依赖，自己手动安装非常复杂而且很可能出错。</p>
+<p>推荐自动化方式安装，Yum 一定要配合 epel 这样的 Yum 源，保障能将依赖一网打尽。当然最好的还是使用 docker 来运行，找个镜像就行了。</p>
+<h3 id="toc_3">插件</h3>
+<p>由于 PgSQL 的很多功能都由插件实现，所以还要安装一些常用的插件，如:</p>
+<div>
+<pre class="line-numbers"><code class="language-none">postgis_topology（管理面、边、点等拓扑对象）
+pgrouting（路径规划）
+postgis_sfcgal（实现3D相关算法）
+fuzzystrmatch（字符串相似度计算）
+address_standardizer/address_standardizer_data_us（地址标准化）
+pg_trgm（分词索引）</code></pre>
+</div>
+<p>这些插件在安装目录 <code>/path/extensions</code> 下编译完毕后，在数据库中使用前要先使用 <code>create extension xxx</code> 启用。</p>
+<h3 id="toc_4">启动</h3>
+<ol>
+    <li>切换到非 root 用户。（PgSQL 在安装完毕后会创建一个名为 <code>postgres</code> 的超级用户，我们可以使用这个超级用户来操作 PgSQL，后期建议重新创建一个普通用户用来管理数据）；</li>
+    <li>切换到 <code>/installPath/bin/</code> 目录下，PgSQL 在此目录下提供了很多命令，如 <code>createdb、createuser、dropdb、pg_dump</code> 等；</li>
+    <li>使用 <code>createdb</code> 命令初始化一个文件夹 <code>dir_db</code> (此目录不能已存在)存放数据库物理数据，使用 <code>-E UTF8</code> 参数指定数据库字符集为 utf-8；</li>
+    <li>使用 <code>pg_ctl -D dir_db</code> 指定数据库启动后台服务；</li>
+    <li>使用 <code>psql -d db</code> 在命令行登陆 PgSQL;</li>
+</ol><hr />
+<h1 id="toc_5">配置</h1>
+<p>安装完毕后还要配置一些比较基本的参数才能正常使用。</p>
+<h3 id="toc_6">Host权限</h3>
+<p>PgSQL需要在 <code>pg_hba.conf</code> 文件中配置数据库 Host 权限，才能被其他机器访问。</p>
+<div>
+<pre class="line-numbers"><code class="language-none"># TYPE  DATABASE        USER            ADDRESS                 METHOD
+local   all             all                                     trust
+host    all             all             127.0.0.1/32            md5
+host    all             all             172.16.0.1/16            md5</code></pre>
+</div>
+<p>文件中注释部分对这几个字段介绍得比较详细， 我们很可能需要添加 <code>host(IP)</code> 访问项， ADDRESS 是普通的网段表示法，METHOD 推荐使用 <code>md5</code>，表示使用 md5 加密传输密码。</p>
+<h3 id="toc_7">服务器配置</h3>
+<p>服务器配置在 <code>postgresql.conf</code>中，修改配置后需要 使用 <code>pg_ctl restart -D dir_db</code> 命令重启数据库；</p>
+<p>此外，我们也可以在登陆数据库后修改配置项：使用 <code>SELECT * FROM pg_settings WHERE name = 'config';</code> 查询当前配置项，再使用 UPDATE 语句更新配置。但有些配置如内存分配策略是只在当前 session 生效的，全局生效需要在配置文件中修改，再重启服务器。</p>
+<p>我们可以修改配置并用客户端验证 SQL 语句的优化，使用 <code>\timing on</code> 开启查询计时，使用 <code>EXPLAIN ANALYSE</code> 语句 分析查询语句效率。 下面介绍两个已实践过的配置参数：</p>
+<ul>
+    <li>shared_buffers：用于指定共享内存缓冲区所占用的内存量。它应该足够大来存储常使用的查询结果，以减少物理I/O。但它也不能太大，以避免系统 内存swap 的发生， 一般设置为系统内存的 20%。</li>
+    <li>work_mem：一个连接的工作内存，在查询结果数据量较大时，此值如果较小的话，会导致大量系统 I/O，导致查询速度急剧下降，如果你的 explain 语句内 <code>buffer 部分 read</code>数值过大，则表示工作内存不足，需要调整加此参数。但此值也不能太大，需要保证 <code>work_mem * max_connections + shared_buffers + 系统内存 &lt; RAM</code>，不然同样可能会导致系统 内存swap。</li>
+</ul>
+<p>这样，PgSQL 就能作为一个正常的关系型数据使用了。</p>
+<hr />
+<h1 id="toc_8">分词</h1>
+<p>全文索引的实现要靠 PgSQL 的 gin 索引。分词功能 PgSQL 内置了英文、西班牙文等，但中文分词需要借助开源插件 <code>zhparser</code>；</p>
+<h3 id="toc_9">SCWS</h3>
+<p>要使用 zhparser，我们首先要安装 SCWS 分词库，SCWS 是 Simple Chinese Word Segmentation 的首字母缩写（即：简易中文分词系统），其 GitHub 项目地址为 <a href="https://github.com/hightman/scws">hightman-scws</a>，我们下载之后可以直接安装。</p>
+<p>安装完后，就可以在命令行中使用 <code>scws</code> 命令进行测试分词了， 其参数主要有：</p>
+<ul>
+    <li>-c utf8 指定字符集</li>
+    <li>-d dict 指定字典 可以是 xdb 或 txt 格式</li>
+    <li>-M 复合分词的级别， 1~15，按位异或的 <code>1|2|4|8</code> 依次表示 <code>短词|二元|主要字|全部字</code>，默认不复合分词，这个参数可以帮助调整到最想要的分词效果。</li>
+</ul>
+<h3 id="toc_10">zhpaser</h3>
+<ol>
+    <li>下载 zhparser 源码 <code>git clone https:github.com/amutu/zhparser.git</code>；</li>
+    <li>安装前需要先配置环境变量：<code>export PATH=$PATH:/path/to/pgsql</code>；</li>
+    <li><code>make &amp;&amp; make install</code>编译 zhparser；</li>
+    <li>登陆 PgSQL 使用 <code>CREATE EXTENSION zhparser;</code> 启用插件；</li>
+    <li>
+        <p>添加分词配置</p>
+        <div>
+<pre class="line-numbers"><code class="language-none">CREATE TEXT SEARCH CONFIGURATION parser_name (PARSER = zhparser); // 添加配置
+ALTER TEXT SEARCH CONFIGURATION parser_name ADD MAPPING FOR n,v,a,i,e,l,j WITH simple; // 设置分词规则 （n 名词 v 动词等，详情阅读下面的文档）</code></pre>
+        </div>
+    </li>
+    <li>
+        <p>给某一列的分词结果添加 gin 索引 <code>create index idx_name on table using gin(to_tsvector('parser_name', field));</code></p>
+    </li>
+    <li>
+        <p>在命令行中使用上一节中介绍的 scws 命令测试分词配置，如我认为复合等级为 <code>7</code> 时分词结果最好，则我在 <code>postgresql.conf</code>添加配置</p>
+        <div>
+<pre class="line-numbers"><code class="language-none">zhparser.multi_short = true #短词复合: 1
+zhparser.multi_duality = true  #散字二元复合: 2
+zhparser.multi_zmain = true  #重要单字复合: 4
+zhparser.multi_zall = false  #全部单字复合: 8</code></pre>
+        </div>
+    </li>
+</ol>
+<h3 id="toc_11">SQL</h3>
+<p>查询中我们可以使用最简单的 <code>SELECT * FROM table WHERE to_tsvector('parser_name', field) @@ 'word'</code> 来查询 field 字段分词中带有 word 一词的数据；</p>
+<p>使用 <code>to_tsquery()</code> 方法将句子解析成各个词的组合向量，如 <code>国家大剧院</code> 的返回结果为 <code>'国家' &amp; '大剧院' &amp; '大剧' &amp; '剧院'</code> ，当然我们也可以使用 <code>&amp; |</code> 符号拼接自己需要的向量；在查询 长句 时，可以使用 <code>SELECT * FROM table WHERE to_tsvector('parser_name', field) @@ to_tsquery('parser_name','words')</code>；</p>
+<p>有时候我们想像 MySQL 的 <code>SQL_CALC_FOUND_ROWS</code> 语句一样同步返回结果条数，则可以使用 <code>SELECT COUNT(*) OVER() AS score FROM table WHERE ...</code>，PgSQL 会在每一行数据添加 score 字段存储查询到的总结果条数；</p>
+<p>到这里，普通的全文检索需求已经实现了。</p>
+<hr />
+<h1 id="toc_12">优化</h1>
+<p>我们接着对分词效果和效率进行优化：</p>
+<h3 id="toc_13">存储分词结果</h3>
+<p>我们可以使用一个字段来存储分词向量，并在此字段上创建索引来更优地使用分词索引：</p>
+<div>
+<pre class="line-numbers"><code class="language-none">ALTER TABLE table ADD COLUMN tsv_column tsvector;           // 添加一个分词字段
+UPDATE table SET tsv_column = to_tsvector('parser_name', coalesce(field,''));   // 将字段的分词向量更新到新字段中
+CREATE INDEX idx_gin_zhcn ON table USING GIN(tsv_column);   // 在新字段上创建索引
+CREATE TRIGGER trigger_name BEFORE INSERT OR UPDATE  ON table FOR EACH ROW EXECUTE PROCEDURE
+tsvector_update_trigger(tsv_column, 'parser_name', field); // 创建一个更新分词触发器</code></pre>
+</div>
+<p>这样，再进行查询时就可以直接使用 <code>SELECT * FROM table WHERE tsv_column @@ 'keyword'</code> 了。</p>
+<p>这里需要注意，这时候在往表内插入数据的时候，可能会报错，提示指定 parser_name 的 schema， 这时候可以使用 <code>\dF</code> 命令查看所有 text search configuration 的参数：</p>
+<div>
+<pre class="line-numbers"><code class="language-none">               List of text search configurations
+   Schema   |    Name    |              Description
+------------+------------+---------------------------------------
+ pg_catalog | english    | configuration for english language
+ public     | myparser   |</code></pre>
+</div>
+<p>注意 schema 参数，在创建 trigger 时需要指定 schema， 如上面，就需要使用 <code>public.myparser</code>。</p>
+<h3 id="toc_14">添加自定义词典</h3>
+<p>我们可以在网上下载 xdb 格式的词库来替代默认词典，词库放在 <code>share/tsearch_data/</code> 文件夹下才能被 PgSQL 读取到，默认使用的词库是 <code>dict.utf8.xdb</code>。要使用自定义词库，可以将词库放在词库文件夹后，在 <code>postgresql.conf</code> 配置 <code>zhparser.extra_dict="mydict.xdb"</code> 参数；</p>
+<p>当我们只有 txt 的词库，想把这个词库作为默认词库该怎么办呢？使用 scws 带的<code>scwe-gen-dict</code> 工具或网上找的脚本生成 xdb 后放入词库文件夹后，在 PgSQL 中分词一直报错，读取词库文件失败。我经过多次实验，总结出了一套制作一个词典文件的方法：</p>
+<ol>
+    <li>准备词库源文件 mydict.txt：词库文件的内容每一行的格式为<code>词 TF IDF 词性</code>，词是必须的，而 <code>TF 词频(Term Frequency)、IDF 反文档频率(Inverse Document Frequency) 和 词性</code> 都是可选的，除非确定自己的词典资料是对的且符合 scws 的配置，不然最好还是留空，让 scws 自已确定；</li>
+    <li>在 <code>postgresql.conf</code> 中设置 <code>zhparser.extra_dicts = "mydict.txt"</code> 同时设置 <code>zhparser.dict_in_memory = true</code>；</li>
+    <li>命令行进入 PgSQL，执行一条分词语句 <code>select to_tsquery('parser', '随便一个词')</code> ，分词会极慢，请耐心(请保证此时只有一个分词语句在执行)；</li>
+    <li>分词成功后，在/tmp/目录下找到生成的 <code>scws-xxxx.xdb</code> 替换掉 <code>share/tsearch_data/dict.utf8.xdb</code>；</li>
+    <li>删除刚加入的 <code>extra_dicts dict_in_memory</code> 配置，重启服务器。</li>
+</ol>
+<h3 id="toc_15">扩展</h3>
+<p>由于查询的是 POI 的名称，一般较短，且很多词并无语义，又考虑到用户的输入习惯，一般会输入 POI 名称的前几个字符，而且 scws 的分词准确率也不能达到100%，于是我添加了名称的前缀查询来提高查询的准确率，即使用 B树索引 实现 <code>LIKE '关键词%'</code> 的查询。这里需</p>
+<p>这里要注意的是，创建索引时要根据字段类型配置 <code>操作符类</code>，不然索引可能会不生效，如在 字段类型为 varchar 的字段上创建索引需要使用语句<code>CREATE INDEX idx_name ON table(COLUMN varchar_pattern_ops)</code>，这里的 varchar<em>pattern</em>ops 就是操作符类，操作符类的介绍和选择可以查看文档：<a href="http://www.postgres.cn/docs/9.4/indexes-opclass.html">11.9. 操作符类和操作符族</a>。</p>
+<p>自此，一个良好的全文检索系统就完成了。</p>
+<hr />
+<h1 id="toc_16">总结</h1>
+<p>简单的数据迁移并不是终点，后续要做的还有很多，如整个系统的数据同步、查询效率优化、查询功能优化（添加拼音搜索、模糊搜索）等。特别是查询效率，不知道是不是我配置有问题，完全达不到那种 E级毫秒 的速度，1kw 的数据效率在进行大结果返回时就大幅下降（200ms），只好老老实实地提前进行了分表，目前百万级查询速度在 20ms 以内，优化还有一段路要走。</p>
+<p>不过这次倒是对 技术的&ldquo;生态&rdquo;有了个更深的体会，这方面 PgSQL 确实和 MySQL 差远了，使用 MySQL 时再奇葩的问题都能在网上快速找到答案，而 PgSQL 就尴尬了，入门级的问题搜索 stackoverflow 来来回回就那么几个对不上的回答。虽然也有阿里的&ldquo;德哥&rdquo;一样的大神在辛苦布道，但用户的数量才是根本。不过，随着 PgSQL 越来越完善，使用它的人一定会越来越多的，我这篇文章也算是为 PgSQL 加温了吧，哈哈~希望能帮到后来的使用者。</p>
+<p>关于本文有什么问题可以在下面留言交流，如果您觉得本文对您有帮助，可以点击下面的 <strong><code>推荐</code></strong> 支持一下我，博客一直在更新，欢迎 <strong><code>关注</code></strong> 。</p>
+<p>参考：</p>
+<p><a href="http://aigo.iteye.com/blog/2064136">PostgreSQL系统配置优化</a></p>
+<p><a href="http://www.jianshu.com/p/80e5d003b62c">[PG]使用 zhparser 进行中文分词全文检索</a></p>
+<p><a href="http://www.xunsearch.com/scws/docs.php#libscws">SCWS 中文分词</a></p>
+<p><a href="https://about.gitlab.com/2016/03/18/fast-search-using-postgresql-trigram-indexes/">Fast Search Using PostgreSQL Trigram Indexes</a></p>
+<p><a href="https://yq.aliyun.com/articles/7730">使用阿里云PostgreSQL zhparser时不可不知的几个参数</a></p>
+<p><a href="https://yq.aliyun.com/articles/59251">德哥的PostgreSQL私房菜 - 史上最屌PG资料合集</a></p>

@@ -1,0 +1,144 @@
+---
+layout: post
+title: "网页实时聊天之js和jQuery实现ajax长轮询"
+date: 2015-11-14 18:00:08 +0800
+comments: true
+---
+
+<p>众所周知，HTTP协议是无状态的，所以一次的请求都是一个单独的事件，和前后都没有联系。所以我们在解决网页实时聊天时就遇到一个问题，如何保证与服务器的长时间联系，从而源源不段地获取信息。</p>
+<p>一直以来的方式无非有这么几种：</p>
+<p style="margin-left: 30px;"><strong><span style="font-family: 'Microsoft YaHei';">1、长连接，即服务器端不断开联系，PHP服务器端用ob系列函数来不停的读取输出，但是相当耗费服务器资源。</span></strong></p>
+<p style="margin-left: 30px;"><strong><span style="font-family: 'Microsoft YaHei';">2、Flash&nbsp;socket，flash的as3语言，创建一个socket服务器用来处理信息。</span></strong></p>
+<p style="margin-left: 30px;"><strong><span style="font-family: 'Microsoft YaHei';">3、轮询，顾名思义就是不停地发送查询消息，一有新消息立刻更新，但是会有多次无用请求。</span></strong></p>
+<p style="margin-left: 30px;"><strong><span style="font-family: 'Microsoft YaHei';">4、长轮询，是轮询的升级版，需要服务器端的配合。</span></strong></p>
+<p style="margin-left: 30px;"><strong><span style="font-family: 'Microsoft YaHei';">5、websocket，HTML5的通信功能，建立一个与服务器端的专用接口ws协议来进行通讯，兼容可能成为问题，改天研究一下这个。</span></strong></p>
+<p>这篇博文总结一下用JS和JQ两种方式（其实不同就是js和jq的实现），实现AJAX长轮询。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">长轮询的思想：</span></strong></p>
+<p><img src="/images/819496-20151114110929165-1485612934.jpg" alt="" /></p>
+<p>如图：用AJAX发送询问信息，服务器在没有信息要返回的时候进入<strong>无限等待</strong>。由于AJAX<strong>异步</strong>的特性，PHP在服务器端执行等待不会影响到页面的正常处理。一旦服务器查询到返回信息，服务器返回信息，AJAX用回调函数处理这条信息，同时迅<strong>速再次发送</strong>一个请求等待服务器处理。</p>
+<p>与传统轮询相比，长轮询在服务器没的返回信息的时候进入等待，减少了普通轮询服务器无数次的空回复。可以这样认为，长轮询使服务器每次的返回更有目的性，而不是盲目返回。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">长轮询的服务器端实现：</span></strong></p>
+<p><strong><span style="font-size: 14pt;">聊天信息存储：</span></strong></p>
+<p>数据库设计为信息ID(msgid)，发送人(sender)，接收人(receiver)，信息内容(content)，设置senderRead和receiverRead的目的是标记信息是否已被读取，读取后改变标记，以区别信息是否已经被读取。</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">create</span> <span style="color: #0000ff;">table</span><span style="color: #000000;"> msg{
+
+　　msgid </span><span><span style="color: #0000ff;">int</span></span> <span style="color: #808080;">not</span> <span style="color: #0000ff;">null</span> <span style="color: #0000ff;">primary</span> <span style="color: #0000ff;">key</span><span style="color: #000000;"> auto_increment,
+
+　　sender </span><span style="color: #0000ff;">char</span>(<span style="color: #800000; font-weight: bold;">16</span>) <span style="color: #808080;">not</span> <span style="color: #0000ff;">null</span><span style="color: #000000;">,
+
+　　receiver </span><span style="color: #0000ff;">char</span>(<span style="color: #800000; font-weight: bold;">16</span>) <span style="color: #808080;">not</span> <span style="color: #0000ff;">null</span><span style="color: #000000;">,
+
+　　content </span><span style="color: #0000ff;">text</span>,     <span style="color: #808080;">//</span><span style="color: #000000;">信息内容用text类型，存储量可达到65535字符
+
+　　senderRead </span><span style="color: #0000ff;">tinyint</span> enum(<span style="color: #800000; font-weight: bold;">0</span>,<span style="color: #800000; font-weight: bold;">1</span>) <span style="color: #0000ff;">default</span> <span style="color: #800000; font-weight: bold;">0</span><span style="color: #000000;">,
+
+　　receiverRead </span><span style="color: #0000ff;">tinyint</span> enum(<span style="color: #800000; font-weight: bold;">0</span>,<span style="color: #800000; font-weight: bold;">1</span>) <span style="color: #0000ff;">default</span> <span style="color: #800000; font-weight: bold;">0</span>    <span style="color: #808080;">//</span><span style="color: #000000;">设置一个是否已读的flag标记
+
+}</span></pre>
+</div>
+<p><strong><span style="font-size: 14pt;">PHP脚本：</span></strong></p>
+<p>&nbsp;脚本的主要目的是处理来自ajax的每次询问，ajax每次询问就查询一下数据库，看有没有新的信息，如果没有，刚用usleep()函数等待一秒后再次查询，直到有新信息插入数据库并被查到，脚本返回查询到的数据，并退出无限循环，结束脚本。</p>
+<div class="cnblogs_code">
+<pre>  <span style="color: #008080;">set_time_limit</span>(0);<span style="color: #008000;">//</span><span style="color: #008000;">设置脚本超时时间为无限，不然在过了超时时间后脚本会自动关闭，轮询失败。</span>
+
+  <span style="color: #800080;">$link</span>=<span style="color: #0000ff;">new</span> mysqli("host","user","password","database"<span style="color: #000000;">);
+
+  </span><span style="color: #800080;">$search</span>="select sender,receiver,content from msg where receiverRead=0 limit 1";<span style="color: #008000;">//</span><span style="color: #008000;">限制每次读出一条数据，便于修改其已读flag</span>
+
+  <span style="color: #800080;">$change</span>="update chat set receiverRead=1 where receiverRead=0 limit 1"<span style="color: #000000;">;
+
+  </span><span style="color: #0000ff;">while</span> (<span style="color: #0000ff;">true</span>) {    <span style="color: #008000;">//</span><span style="color: #008000;">进入无限循环</span>
+
+  　　　　<span style="color: #800080;">$res</span>=<span style="color: #800080;">$link</span>-&gt;query(<span style="color: #800080;">$sql</span>);  <span style="color: #008000;">//</span><span style="color: #008000;">查询结果</span>
+
+     　　 <span style="color: #0000ff;">if</span>(<span style="color: #800080;">$res</span>-&gt;num_rows!=0){  <span style="color: #008000;">//</span><span style="color: #008000;">当有未读信息时读取信息</span>
+
+      　　　　　　<span style="color: #800080;">$link</span>-&gt;query(<span style="color: #800080;">$change</span>);<span style="color: #008000;">//</span><span style="color: #008000;">将信息的已读flag设为1</span>
+
+      　　　　　　<span style="color: #800080;">$msg</span>=<span style="color: #800080;">$res</span>-&gt;<span style="color: #000000;">fetch_assoc();
+
+      　　　　　　</span><span style="color: #800080;">$jsonstr</span>=json_encode(<span style="color: #800080;">$msg</span>);<span style="color: #008000;">//</span><span style="color: #008000;">取到信息，将信息用转码为json格式，返回给JS</span>
+
+      　　　　　　<span style="color: #0000ff;">echo</span> <span style="color: #800080;">$jsonstr</span><span style="color: #000000;">;
+
+      　　　　　　</span><span style="color: #0000ff;">break</span>;<span style="color: #008000;">//</span><span style="color: #008000;">输出信息后退出while循环，结束当前脚本</span>
+<span style="color: #000000;">
+    　　　　}
+
+    　　</span><span style="color: #008080;">usleep</span>(1000);<span style="color: #008000;">//</span><span style="color: #008000;">如果没有信息不会进入if块，但会执行一下等待1秒，防止PHP因循环假死。</span>
+<span style="color: #000000;">
+  }</span></pre>
+</div>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">客户端实现：</span></strong></p>
+<p>客户端的主要任务是设置一个ajax请求函数，每次查询时被调用，当没有信息返回时，服务器端被搁置，当前页面正常执行；当有信息返回时，函数处理返回的数据，并迅速再次调用此函数发送一次请求。</p>
+<p><strong><span style="font-size: 14pt;">用原生JS：</span></strong></p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">function</span><span style="color: #000000;"> link(){
+
+    </span><span style="color: #0000ff;">var</span> xhr=<span style="color: #0000ff;">null</span>;<span style="color: #008000;">//</span><span style="color: #008000;">先设置xhr为空，为了轮询时再次调用函数对xhr重用，引发错误</span>
+<span style="color: #000000;">
+    xhr</span>=<span style="color: #0000ff;">new</span><span style="color: #000000;"> XMLHttpRequest();
+
+    xhr.open(</span>'GET','serviceback.php',<span style="color: #0000ff;">true</span>);<span style="color: #008000;">//</span><span style="color: #008000;">第三个参数一定要设置为true，异步不阻塞，不会影响到后面JS的执行。</span>
+<span style="color: #000000;">
+    xhr.send();
+
+    xhr.onreadystatechange</span>=<span style="color: #0000ff;">function</span><span style="color: #000000;">(){
+
+    　　　　</span><span style="color: #0000ff;">if</span> (xhr.readyState==4) { 严密也可加使用（xhr.readyState==4 &amp;&amp; xhr.status ==200<span style="color: #000000;">）限定服务器响应码为200时才进行处理。
+
+        　 　　　　</span><span style="color: #0000ff;">if</span>(xhr.responseText!=''<span style="color: #000000;">){
+
+           　　　　　　　　process...  </span><span style="color: #008000;">//</span><span style="color: #008000;">服务器端返回信息，且返回信息不为空，则开始处理返回信息。</span>
+<span style="color: #000000;">
+       　　　　　　}
+
+        　　setTimeout(</span>"link()",300);<br /><br /><span style="color: #008000;">//</span><span style="color: #008000;">递归再次调用link()函数，用setTimeOut()设置延时是因为服务器端进行sql操作时会耗时，当有新信息时，在服务器将要置已读flag为1还未成功时，AJAX可能已经又发出多条查询信息了，会导致一条信息多次返回。</span>
+<span style="color: #000000;">
+      　　}
+
+    };
+}</span></pre>
+</div>
+<p><strong><span style="font-size: 14pt;">用jQuery插件实现：</span></strong></p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">var</span> link={  　　　　　　　　　　<span style="color: #008000;">//</span><span style="color: #008000;">jQuery的AJAX执行的配置对象</span>
+<span style="color: #000000;">
+      type:</span>"GET",　　　　　　<span style="color: #008000;">//</span><span style="color: #008000;">设置请求方式，默认为GET，</span>
+<span style="color: #000000;">
+      async:</span><span style="color: #0000ff;">true</span>,　　　　　　<span style="color: #008000;">//</span><span style="color: #008000;">设置是否异步，默认为异步</span>
+<span style="color: #000000;">
+      url:</span>"customback.php"<span style="color: #000000;">,
+
+      dataType:</span>"json",　　　　<span style="color: #008000;">//</span><span style="color: #008000;">设置期望的返回格式，因服务器返回json格式，这里将数据作为json格式对待</span>
+<span style="color: #000000;">
+      success:</span><span style="color: #0000ff;">function</span><span style="color: #000000;"> (msg){
+
+         　　 process...
+
+          　　setTimeout(</span>"link()",300<span style="color: #000000;">);
+
+      }　　　　　　　　　　　　　　</span><span style="color: #008000;">//</span><span style="color: #008000;">成功时的回调函数，处理返回数据，并且延时建立新的请求连接</span>
+<span style="color: #000000;">
+}
+
+$.ajax(link);　　　　　　　　　　</span><span style="color: #008000;">//</span><span style="color: #008000;">执行ajax请求。</span></pre>
+</div>
+<hr />
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">程序扩充：</span></strong></p>
+<p><strong><span style="font-size: 14pt;">添加发送聊天窗口：</span></strong></p>
+<p>新建一个函数用来处理ajax的POST请求，用ajax将发信人，每次发送的信息，收信人发送到服务器端，并设置一个单独的PHP脚本处理信息，将信息插入数据库。</p>
+<p>需要注意的是，用JS原生实现POST请求发送信息时，要<strong>设置ajax对象的HTTP头</strong>，模拟表单提交的操作：</p>
+<p>xhr.setRequestHeader("Content-type","application/x-www-form-urlencoded");</p>
+<p><span style="font-size: 14pt;"><strong>聊天室消息处理：</strong></span></p>
+<p>为了防止每次都查询到全部信息，我们对数据库的查询操作更改一下，设置idflag=0,每次查询后，设置idflag为查询到的数据的id，查询时我们查询比idflag大的ID，即，新添加进去的信息。</p>
+<p>这样，一个简单的聊天室程序就做好了。</p>
+<p>&nbsp;</p>
+<p>如果您觉得本博文对您有帮助，您可以推荐或关注我，如果您有什么问题，可以在下方留言讨论，谢谢。</p>

@@ -1,0 +1,105 @@
+---
+layout: post
+title: "搭建自己的PHP框架心得（三）"
+date: 2016-06-27 18:00:08 +0800
+comments: true
+---
+
+<h1 id="toc_0">续言</h1>
+<p>接着完善自己的PHP框架，本次更新的主要内容有：</p>
+<ul>
+    <li>介绍了异常处理机制</li>
+    <li>完善了异常和错误处理</li>
+    <li>数据表跟Model类的映射</li>
+</ul>
+<hr />
+<h1 id="toc_1">异常处理</h1>
+<blockquote>
+    <p>异常处理：异常处理是编程语言或计算机硬件里的一种机制，用于处理软件或信息系统中出现的异常状况（即超出程序正常执行流程的某些特殊条件）</p>
+</blockquote>
+<p>异常处理用于处理程序中的异常状况，虽说是&ldquo;异常状态&rdquo;，但仍然还是在程序编写人员的预料之中，其实程序的异常处理完全可以用&lsquo;if else&rsquo;语句来代替，但异常处理自然有其优势之处。</p>
+<p>个人总结其优点如下：</p>
+<ul>
+    <li>可以快速终止流程，重置系统状态，清理变量和内存占用，在普通WEB应用中，一次请求结束后，FAST CGI会自动清理变量和上下文，但如果在PHP的命令行模式执行守护脚本时，它的效果就会很方便了。</li>
+    <li>大量的if else语句会使代码变得繁杂难懂，使用异常处理可以使程序逻辑更清晰易懂，毕竟处理异常的入口只有catch语句一处。</li>
+    <li>一量程序中的函数出现异常结果或状况，如果使用函数的return方式返回异常信息，层层向上，每一次都要进行return判断。使用异常处理我们可以假设所有的返回信息都是正常的，避免了大量的代码重复。</li>
+</ul>
+<p>虽然将代码放在try catch块中会有微微的效率差，但是跟这些优点一比，这点消耗就不算什么了。那么PHP的异常处理怎么使用呢？</p>
+<p>PHP内置有Exception类，使得我们可以通过实例化异常类来抛出异常。我们将代码放在try语句中执行，并在其后用catch试图捕捉到在try代码块中抛出的异常，并对异常进行处理。我们还可以在catch代码段后使用finally语句块，无论是否有异常都会执行finally代码块的代码，try catch语句形如下面代码：</p>
+<div>
+<pre><code class="language-none">try{
+    throw new Exeption('msg'[,'code'，$previous_exeception]);
+}catch(Exeption $var) {
+    process($var);
+}catch(MyException $e){
+    process($e)
+}finally{
+    dosomething();
+}</code></pre>
+</div>
+<p>使用try catch语句，需要注意：</p>
+<ul>
+    <li>当我们抛出异常时，会实例化一个异常类，此异常类可以自己定义，但在catch语句中，我们需要规定要捕获的异常对象的类名，并且只能捕获到特定类的异常对象，当然我们可以在最后捕获一个异常基类（PHP内置异常类）来确保异常一定能被捕获。</li>
+    <li>在抛出异常时，程序会被终止，并回溯代码找到第一个能捕获到它的catch语句，try catch语句是可以嵌套的，并且如上面代码所示 cacth语句是可以多次定义的。</li>
+    <li><span style="color: #ff0000;">finally块会在try catch块结束后执行，即使在try catch块中使用return返回，程序没有执行到最后。</span></li>
+</ul>
+<hr />
+<h1 id="toc_2">框架里的异常处理</h1>
+<p>说了那么多异常相关(当然解释这些也是为了能理解和使用框架)，那么框架里要怎么实现呢？</p>
+<h3 id="toc_3">重写异常类</h3>
+<p>我们可以重写异常类，完善其内部方法：</p>
+<div>
+<pre><code class="language-none">&lt;?php
+class Exception
+{
+    protected $message = 'Unknown exception';   // 异常信息
+    protected $code = 0;                        // 异常代码
+    protected $file;                            // 发生异常的文件名
+    protected $line;                            // 发生异常的代码行号
+
+    function __construct($message = null, $code = null，$previous_exeception = null);
+
+    final function getMessage();                // 返回异常信息
+    final function getCode();                   // 返回异常代码
+    final function getFile();                   // 返回发生异常的文件名
+    final function getLine();                   // 返回发生异常的代码行号
+    final function getTrace();                  // 返回异常trace数组
+    final function getTraceAsString();          // 返回异常trace信息
+
+    /**
+     * 记录错误日志
+     */
+    protected function log(){
+        Logger::debug();
+    }
+}  </code></pre>
+</div>
+<p>如上，final方法是不可以重写的，除此之外，我们可以定义自己的方法，如记录异常日志，像我自定义的log方法，在catch代码块中，就可以直接使用<code>$e-&gt;log</code>来记录一个异常日志了。</p>
+<h3 id="toc_4">注册全局异常方法</h3>
+<p>我们可以使用set_exception_handler('exceptionHandler')来全局捕获没有被catch块捕获到的异常，此异常处理函数需要传入一个异常处理对象，这样可以分析此异常处理信息，避免系统出现不人性化的提示，增强框架的健壮性。</p>
+<div>
+<pre><code class="language-none">function exceptionHandler($e) {
+    echo '有未被捕获的异常,在' . $e-&gt;getFile() . "的" . $e-&gt;getLine() . "行!";
+}</code></pre>
+</div>
+<h3 id="toc_5">其他全局函数</h3>
+<p>顺便再说一下其他的全局处理函数：</p>
+<ul>
+    <li>set_shutdown_function('shutDownHandler')来执行脚本结束时的函数,此函数即使是在ERROR结束后，也会自动调用。</li>
+    <li>set_error_handler('errorHandler')在PHP发生错误时自动调用，注意，必须在已注册错误函数后才发出的错误才会调用。函数参数形式应为($errno, $errstr, $errfile, $errline);</li>
+</ul>
+<p>但是要注意这些全局函数需要在代码段的前面已经定义过再注册。</p>
+<hr />
+<h1 id="toc_6">数据表和Model类的ActiveRecord映射</h1>
+<p>初次使用yii2的ActivceRecord类觉得好方便，只需要定义其字段同名属性再调用save方法就OK了（好神奇啊），它是怎么实现的呢，看了下源码，明白了其大致实现过程（基类）。</p>
+<ol>
+    <li>使用&lsquo;describe table_name&rsquo; 查询语句；</li>
+    <li>分析查询结果：对每一个字段，有Field(字段名)、Type(数据类型)、Null(是否为空)、Key(索引信息，&lsquo;PRI&rsquo;表示为主键)、Default(默认值)、Extra(附加信息，如auto_increment)</li>
+    <li>通过判断其主键（<code>$row['KEY'] == 'PRI'</code>）信息，保存时看是否有主键信息，若存在，则为更新；不存在，则插入。</li>
+    <li>另外，解析出来的字段信息还有更多妙用~~</li>
+</ol><hr />
+<h1 id="toc_7">结语</h1>
+<p>感觉好久没写博客了，&lsquo;毕业&rsquo;对于一个类似专科学习方式的人来说是有些繁琐了，保存好对学校的留恋，继续出发。</p>
+<p>真是越学习越觉得自己认识不够，在看一些PHP框架源码时，有时候会感觉自己还差得很远，那种整体感和布局感，估计需要时间和经验的积累吧。</p>
+<p>因为框架的应用和自己现在的工作关系不是特别大，而且自己最近在努力学习一些编程底层类的东西，所以框架系列可能会有些&lsquo;便秘&rsquo;，会写点其他的。。。这两天准备换地方住了，跑着看房子了，原谅我&lsquo;短&rsquo;一点。。</p>
+<p>哈哈，欢迎继续关注我的博客，嗯，一直在用心。</p>

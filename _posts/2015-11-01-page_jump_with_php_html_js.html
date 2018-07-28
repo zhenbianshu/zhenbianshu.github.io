@@ -1,0 +1,84 @@
+---
+layout: post
+title: "用HTML/JS/PHP方式实现页面延时跳转"
+date: 2015-11-01 18:00:06 +0800
+comments: true
+---
+
+<p>WEB开发中经常会遇到页面跳转或延时跳转的需求，掌握各种页面跳转方式非常必要。</p>
+<p><span style="font-family: 宋体;">以下是我总结有用HTML/JS/PHP三类方式实现跳转的方法，例子皆为三秒后跳转到</span><span style="font-family: Calibri;">index.php</span><span style="font-family: 宋体;">页面。</span></p>
+<p><span style="font-size: 18px;"><strong>1,HTML<span style="font-family: 宋体;">方法：</span></strong></span></p>
+<p>在<span style="font-family: Calibri;">HEAD</span><span style="font-family: 宋体;">中添加</span><span style="font-family: Calibri;">&lt;meta&gt;</span><span style="font-family: 宋体;">标签</span></p>
+<div class="cnblogs_code">
+    <pre><span style="color: #0000ff;">&lt;</span><span style="color: #800000;">meta </span><span style="color: #ff0000;">http-equiv</span><span style="color: #0000ff;">=&rdquo;refresh&rdquo; </span><span style="color: #ff0000;">content</span><span style="color: #0000ff;">=&rdquo;3;url=&rsquo;index.php&rsquo;&rdquo; </span><span style="color: #0000ff;">&gt;</span></pre>
+</div>
+<p><strong><span style="font-size: 18px;">2,JS<span style="font-family: 宋体;">控制跳转方法</span></span></strong></p>
+<p>A.Location<span style="font-family: 宋体;">直接加链接方式</span></p>
+<div class="cnblogs_code">
+<pre>&lt;script type="text/javascript"&gt;<span style="color: #000000;">
+
+　　setTimeout(</span>"window.location=('index.php'",3000<span style="color: #000000;">);
+
+</span>&lt;/script&gt;</pre>
+</div>
+<p>B.Location.href<span style="font-family: 宋体;">方式</span></p>
+<div class="cnblogs_code">
+<pre>&lt;script type="text/javascript"&gt;<span style="color: #000000;">
+
+　　setTimeout(</span>"window.location.href='index.php'",3000<span style="color: #000000;">);
+
+</span>&lt;/script&gt;</pre>
+</div>
+<p>C.Location.assign<span style="font-family: 宋体;">方式</span></p>
+<div class="cnblogs_code">
+<pre>&lt;script type="text/javascript"&gt;<span style="color: #000000;">
+
+　　setTimeout(</span>"window.location.assign('index.php')",3000<span style="color: #000000;">);
+
+</span>&lt;/script&gt;</pre>
+</div>
+<p>D.Location.replace<span style="font-family: 宋体;">方式（注意页面是被&ldquo;替换&rdquo;掉了，不会在浏览器的历史记录被查询到）</span></p>
+<div class="cnblogs_code">
+<pre>&lt;script type="text/javascript"&gt;<span style="color: #000000;">
+
+　　Widdow.location.replace(&lsquo;index.php&rsquo;);
+
+</span>&lt;/script&gt;</pre>
+</div>
+<p>E.JS<span style="font-family: 宋体;">历史记录</span><span style="font-family: Calibri;">go(n)</span><span style="font-family: 宋体;">方式（</span><span style="font-family: Calibri;">n</span><span style="font-family: 宋体;">表示对历史记录相对当前页的前进步数，</span><span style="font-family: Calibri;">n</span><span style="font-family: 宋体;">为负数表示返回以前的页面）</span></p>
+<div class="cnblogs_code">
+<pre>&lt;script type="text/javascript"&gt;<span style="color: #000000;">
+
+　　window.history.go(n);
+
+</span>&lt;/script&gt;</pre>
+</div>
+<p>F.JS<span style="font-family: 宋体;">历史记录</span><span style="font-family: Calibri;">go(url)</span><span style="font-family: 宋体;">方式（注意</span><span style="font-family: Calibri;">url</span><span style="font-family: 宋体;">必须是历史记录内的，不然页面不会进行跳转）</span></p>
+<div class="cnblogs_code">
+<pre>&lt;script type="text/javascript"&gt;<span style="color: #000000;">
+
+　　window.history.go(&lsquo;index.php&rsquo;);
+
+</span>&lt;/script&gt;</pre>
+</div>
+<p>G.JS&nbsp;window.open<span style="font-family: 宋体;">方式，通过打开一个新窗口，实现跳转。（其第二个属性为可选目标选项，值可以是</span><span style="font-family: Calibri;">frame&nbsp;id/_blank</span><span style="font-family: 宋体;">等，第三个选项为新弹出窗口的具体设置选项，包括</span><span style="font-family: Calibri;">height/width</span><span style="font-family: 宋体;">等）</span></p>
+<div class="cnblogs_code">
+<pre>&lt;script type="text/javascript"&gt;<span style="color: #000000;">
+
+　　setTimeout(</span>"window.open('index.php',target,args)",3000<span style="color: #000000;">);
+
+</span>&lt;/script&gt;</pre>
+</div>
+<p><strong><span style="font-size: 18px;">3<span style="font-family: 宋体;">，</span><span style="font-family: Calibri;">PHP</span><span style="font-family: 宋体;">脚本控制跳转方式，通过改写</span><span style="font-family: Calibri;">HTTP</span><span style="font-family: 宋体;">头信息来进行跳转</span></span></strong></p>
+<p>A.header&nbsp;refresh<span style="font-family: 宋体;">方式：</span></p>
+<div class="cnblogs_code">
+    <pre><span style="color: #008080;">Header</span>(&ldquo;refresh:3;url=&rsquo;index.php&rsquo;&rdquo;);</pre>
+</div>
+<p>B.&nbsp;header&nbsp;location&nbsp;<span style="font-family: 宋体;">方式&nbsp;：</span></p>
+<div class="cnblogs_code">
+<pre><span style="color: #008080;">sleep</span>(3<span style="color: #000000;">);
+
+</span><span style="color: #008080;">Header</span>(&ldquo;location:index.php&rdquo;);</pre>
+</div>
+<p>要注意这种方式会导致无法进入当前页面。即若当前在<span style="font-family: Calibri;">register.php</span><span style="font-family: 宋体;">页面链接到</span><span style="font-family: Calibri;">login.php</span><span style="font-family: 宋体;">页面时，</span><span style="font-family: Calibri;">login.php</span><span style="font-family: 宋体;">页面内用</span><span style="font-family: Calibri;">header&nbsp;location</span><span style="font-family: 宋体;">方式跳转，页面会从</span><span style="font-family: Calibri;">register.php</span><span style="font-family: 宋体;">页面直接等待三秒跳转到</span><span style="font-family: Calibri;">index.php</span><span style="font-family: 宋体;">，不会进入到</span><span style="font-family: Calibri;">login.php</span><span style="font-family: 宋体;">页面，这是因为</span><span style="font-family: Calibri;">header&nbsp;location</span><span style="font-family: 宋体;">会对页面进行重定向。</span></p>
+<p><span style="font-family: 宋体;">如有错误，欢迎指正，谢谢。</span></p>

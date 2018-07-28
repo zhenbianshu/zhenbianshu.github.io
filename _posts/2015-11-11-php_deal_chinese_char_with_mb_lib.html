@@ -1,0 +1,57 @@
+---
+layout: post
+title: "PHP用mb_string函数库处理与windows相关中文字符"
+date: 2015-11-11 18:00:08 +0800
+comments: true
+---
+
+<p>昨天想批处理以前下载的一堆文件，把文件里的关键内容用正则匹配出来，集中处理。在操作文件时遇到一个问题，就是windows操作系统中的编码问题。</p>
+<p>我们都知道windows中（当然是中文版），文件名和文件内容等编码都是<strong>gbk</strong>，而我们在开发过程中，IDE里的编码则是<strong>UTF-8</strong>，（这里不讨论为什么等等问题，</p>
+<p>只考虑怎么把编码转变成一样的）所以导致我写的UTF-8编码的正则模式字符串中的中文在gbk编码的文件中并不能正确匹配。</p>
+<hr />
+<p>&nbsp;</p>
+<p>一开始，我并没有什么办法，试过把PHP脚本文件的编码也改成GBK，也可以用，但是想到这种方法太low了，所以找一找PHP中有没有函数可以满足我的需求。</p>
+<p>这时，我想到了以前在处理windows中的文件名时用的函数<span style="color: #ff0000;"><strong>iconv()</strong></span>,其函数原型如下：</p>
+<blockquote>
+  <p>string&nbsp;iconv&nbsp;(&nbsp;string&nbsp;$in_charset&nbsp;,&nbsp;string&nbsp;$out_charset&nbsp;,&nbsp;string&nbsp;$str&nbsp;)</p>
+  <p>Performs&nbsp;a&nbsp;character&nbsp;set&nbsp;conversion&nbsp;on&nbsp;the&nbsp;string&nbsp;str&nbsp;from&nbsp;in_charset&nbsp;to&nbsp;out_charset.&nbsp;</p>
+</blockquote>
+<p>我们常使用：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$out_charset</span>='utf-8'<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$fileName</span>=<span style="color: #008080;">iconv</span>(<span style="color: #800080;">$fileName</span>,<span style="color: #800080;">$out_charset</span>,'gbk');</pre>
+</div>
+<p>来处理文件名，将文件名改从gbk改为UTF-8而内容不变。</p>
+<p>手册翻译附加：</p>
+<ul>
+  <li>如果你在输出字符串$out_charset后面添加//TRANSLIT即$out_charset='utf-8//TRANSLIT',在遇到不能转换为UTF-8的字符时，程序会自动替换为一个相似字符的UTF-8字符；</li>
+  <li>如果你在输出字符串$out_charset后面添加//IGNORE即$out_charset='utf-8//IGNORE',在遇到不能转换为UTF-8的字符时，程序会自动跳过这个字符。</li>
+  <li>如果你什么都没加，就在遇到不能替换成UTF-8的字符时，替换会被中断。</li>
+</ul>
+<p>但是，我在用这个函数处理时，结果却是这样：</p>
+<p><img src="/images/819496-20151111083344462-196924166.png" alt="" /></p>
+<p>意思是iconv()函数能处理的最大字符数只有64，一般的文件名大小，而我的文件内容很显然不止64个字符。</p>
+<p>没有办法，我只好再次各种翻找别的函数。</p>
+<hr />
+<p>&nbsp;</p>
+<p>直到我发现了mb_string函数库，这个函数库一般都在PHP环境里集成，我们可以在phpinfo()里找到它。</p>
+<p><img src="/images/819496-20151111083727619-318189619.png" alt="" /></p>
+<p>mb_string函数里有一个<span style="color: #ff0000;"><strong>mb_convert_encoding()</strong></span>函数，可以将一个字符串的编码改变，其函数原型如下：</p>
+<blockquote>
+  <p>string&nbsp;mb_convert_encoding&nbsp;(&nbsp;string&nbsp;$str&nbsp;,&nbsp;string&nbsp;$to_encoding&nbsp;[,&nbsp;mixed&nbsp;$from_encoding&nbsp;]&nbsp;)</p>
+  <p>Converts&nbsp;the&nbsp;character&nbsp;encoding&nbsp;of&nbsp;string&nbsp;str&nbsp;to&nbsp;to_encoding&nbsp;from&nbsp;optionally&nbsp;from_encoding.&nbsp;</p>
+</blockquote>
+<p>基原型跟iconv()函数差不多，只是它没有对输出函数的后缀修饰，它也没有对字符串长度的明确限制。</p>
+<p>而且我们看到$from_encoding是可选的，它可以自动识别源编码。</p>
+<p>因为找不到一个确切的无法转码的字符，也不知道它遇到无法转码的字符会怎么处理。</p>
+<p>通过mb_convert_encoding()函数，将整个文件处理了一下，于是，问题顺利解决。</p>
+<hr />
+<p>&nbsp;</p>
+<p>最后介绍一下<span style="color: #ff0000;"><strong>mb_string</strong></span>函数库，它全名叫Multibyte&nbsp;String，它的很多方法都扩展自PHP自身的string函数库，函数名在原函数的前面加了"mb_"，这些函数除了拥有原函数的作用外，还在可选参数的最后加入了一个<strong>$encoding</strong>的可选参数，这个参数可以规定函数以什么样的编码方式来处理字符串。</p>
+<p>例如strpos()函数，找到一个字符串在另一个字符串中的位置。</p>
+<p>strpos("欢迎来访问","问",0)返回的结果是12，因为脚本是UTF-8编码，而将字符串转为UTF-8编码后，每个中文字符会占用3个字节。</p>
+<p>而在mb_strpos()函数中，mb_strpos("欢迎来访问","问",0,'utf-8')则会返回4,它会将字符串当作已经转UTF-8的状态执行。</p>
+<p>而mb_strpos("欢迎来访问","问",0,'gbk')会返回6</p>
+<p>当然，它还有更多有特色的地方~</p>
+<p>如果您觉得本博文对您有帮助，您可以推荐或关注我，如果您有什么问题，可以在下方留言讨论，谢谢。</p>

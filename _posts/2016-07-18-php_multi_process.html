@@ -1,0 +1,87 @@
+---
+layout: post
+title: "初探PHP多进程"
+date: 2016-07-18 18:00:08 +0800
+comments: true
+---
+
+<h1 id="toc_0">准备</h1>
+<p>我们都知道PHP是单进程执行的，PHP处理多并发主要是依赖服务器或PHP-FPM的多进程及它们进程的复用，但PHP实现多进程也意义重大，尤其是在后台Cli模式下处理大量数据或运行后台DEMON守护进程时，多进程的优势不用多说。</p>
+<p>PHP的多线程也曾被人提及，但进程内多线程资源共享和分配的问题难以解决。PHP也有多线程想关的扩展 pthreads ，但据说不太稳定，且要求环境为线程安全，所用不多。</p>
+<p>以前PHP群里的一位大神曾指导说后台PHP想进阶必然避不开多进程，正好公司里的守护进程也应用了PHP的多进程，结合着谷哥的各种资料和手册，总算理解了多进程，并自己写了一个小demo（在linux系统上实现的），用此文总结一下，如有错漏，谢谢提出。</p>
+<p>要实现PHP的多进程，我们需要两个扩展 pcntl和 posix，安装方法这里不再赘述。</p>
+<hr />
+<h1 id="toc_1">创建子进程</h1>
+<p>创建PHP子进程是多进程的开始，我们需要<code>pcntl_fork()</code>函数；</p>
+<h3 id="toc_2">fork函数详解</h3>
+<p>pcntl_fork() &mdash; 在当前进程当前位置产生分支（子进程）。此函数创建了一个新的子进程后，子进程会继承父进程当前的上下文，和父进程一样从pcntl_fork()函数处继续向下执行，只是获取到的pcntl_fork()的返回值不同，我们便能从判断返回值来区分父进程和子进程，分配父进程和子进程去做不同的逻辑处理。</p>
+<p>pcntl_fork()函数成功执行时会在父进程返回子进程的进程id(pid)，因为系统的初始进程init进程的pid为1，后来产生进程的pid都会大于此进程，所以我们可以通过判断pcntl_fork()的返回值大于1来确实当前进程是父进程；</p>
+<p>而在子进程中，此函数的返回值会是固定值0，我们也可以通过判断pcntl_fork()的返回值为0来确定子进程；</p>
+<p>而pcntl_fork()函数在执行失败时，会在父进程返回-1,当然也不会有子进程产生。</p>
+<h3 id="toc_3">fork进程实例</h3>
+<p>以下是fork子进程的一个简单的小例子：</p>
+<div>
+<pre><code class="language-none">    $ppid = posix_getpid();
+    $pid = pcntl_fork();
+    if ($pid == -1) {
+        throw new Exception('fork子进程失败!');
+    } elseif ($pid &gt; 0) {
+        cli_set_process_title("我是父进程,我的进程id是{$ppid}.");<br />　　　　 sleep(30); // 保持30秒，确保能被ps查到
+    } else {
+        $cpid = posix_getpid();
+        cli_set_process_title("我是{$ppid}的子进程,我的进程id是{$cpid}.");
+        sleep(30);
+    }</code></pre>
+</div>
+<p>这时介绍一下两个函数：</p>
+<p><code>posix_getpid()</code>：获取当前进程的pid;</p>
+<p><code>cli_set_process_title('响亮的名字')</code>：为当前进程取一个响亮的名字。</p>
+<p>运行这个例子，我们便能看到当前两个PHP进程了。&nbsp;</p>
+<p><img src="/images/819496-20160716165020014-45014597.png" alt="" /></p>
+<hr />
+<h1 id="toc_4">管理子进程</h1>
+<p>创建好了进程，那么怎么对子进程进行管理呢？使用信号。</p>
+<blockquote>
+    <p>在计算机科学中，信号是Unix、类Unix以及其他POSIX兼容的操作系统中进程间通讯的一种有限制的方式。它是一种异步的通知机制，用来提醒进程一个事件已经发生。</p>
+</blockquote>
+<h3 id="toc_5">分发信号处理器</h3>
+<p>我们通过在父进程接收子进程传来的信号，判断子进程状态，来对子进程进行管理。</p>
+<p>我们需要在父进程里使用<code>pcntl_signal()</code>函数和<code>pcntl_signal_dispatch()</code>函数来给各个子进程安装信号处理器。</p>
+<div>
+<pre><code class="language-none">pcntl_signal (int $signo , callback $handler) 安装一个信号处理器；
+        $signo是待处理的信号常量，callback是其处理函数
+
+pcntl_signal_dispatch () 调用每个等待信号通过pcntl_signal()安装的处理器</code></pre>
+</div>
+<p>PHP内常见的信号常量有：</p>
+<div>
+<pre><code class="language-none">        SIGCHLD     子进程退出成为僵尸进程会向父进程发送此信号
+        SIGHUP      进程挂起
+        SIGTEM      进程终止
+        ...         // 其他请在手册中查看</code></pre>
+</div>
+<p>安装并调用信号处理器后，一旦子进程有相应的信号返回给父进程，父进程就可以调用相应的callback函数对子进程处理；</p>
+<h3 id="toc_6">处理子进程</h3>
+<p>对子进程的处理方法有:</p>
+<p><code>posix_kill()</code>：此函数并不能顾名思义，它通过向子进程发送一个信号来操作子进程，在需要要时可以选择给子进程发送进程终止信号来终止子进程；</p>
+<p><code>pcntl_waitpid()</code>：等待或返回fork的子进程状态，如果指定的子进程在此函数调用时已经退出（俗称僵尸进程），此函数将立刻返回，并释放子进程的所有系统资源，此进程可以避免子进程变成僵尸进程，造成系统资源浪费；</p>
+<p>下面是两个函数的函数原型：</p>
+<div>
+<pre><code class="language-none">bool posix_kill ( int $pid , int $sig ) // 向进程id为$pid的进程发送$sig信号，$sig常见信号如上；
+
+int pcntl_waitpid ( int $pid , int &amp;$status [, int $options = 0 ] )  // 挂起当前进程的执行直到进程号为$pid的进程退出(如果$pid为-1，则等待任意一个子进程); </code></pre>
+</div>
+<hr />
+<h1 id="toc_7">总结</h1>
+<p>这就是PHP多进程的基础使用了，感兴趣的可以自己写一个demo试一试手了。</p>
+<p>最后贴一下鸟哥所说的PHP多进程优点：</p>
+<blockquote><ol>
+    <li>使用多进程, 子进程结束以后, 内核会负责回收资源</li>
+    <li>使用多进程,子进程异常退出不会导致整个进程Thread退出. 父进程还有机会重建流程.</li>
+    <li>一个常驻主进程, 只负责任务分发, 逻辑更清楚.</li>
+</ol></blockquote>
+<p>对了，还有一个实例，改日上传到github，欢迎大家关注 &gt;&gt; <a href="https://github.com/zhenbianshu">枕边书</a>。</p>
+<p>参考资料：</p>
+<p><a href="http://www.laruence.com/2009/06/11/930.html">PHP CLI模式下的多进程应用 - 风雪之隅</a></p>
+<p><a href="https://www.pureweber.com/article/php-multi-process-programming-preview/">PHP多进程编程初步-PureWeber - 纯粹互联网</a></p>
+<p><a href="http://imhuchao.com/638.html">用php编写守护进程 - 胡超博客</a></p>

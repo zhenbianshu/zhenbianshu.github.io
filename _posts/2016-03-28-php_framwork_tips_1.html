@@ -1,0 +1,99 @@
+---
+layout: post
+title: "搭建自己的PHP框架心得（一）"
+date: 2016-03-28 18:00:08 +0800
+comments: true
+---
+
+<h1>前言</h1>
+<p>说到写PHP的MVC框架，大家想到的第一个词--&ldquo;造轮子&rdquo;，是的，一个还没有深厚功力的程序员，写出的PHP框架肯定不如那些出自大神们之手、经过时间和各种项目考验的框架。但我还是准备并且这么做了，主要是因为：</p>
+<ul>
+    <li>认为有关PHP的方方面面都了解了，但自己学习PHP的时间还短，基础并不扎实，很多常用函数的参数还偶尔要查手册，而且对于PHP的一些较新的特性如命名空间、反射等只是简单的看过，并没有能实际应用过。</li>
+    <li>PHP的知识多且杂，一个普通的项目往住是业务逻辑代码为主，而框架是一个能把这些知识点能融汇在一起的项目。</li>
+    <li>在自己写一个框架的时候，也会参考一些我使用过的框架如TP/CI/YII等的源码，在自己看源码时也能帮助自己理解框架，更容易接受以后要使用的框架。</li>
+</ul>
+<p>所以说，这次造轮子的目的不是为了造轮子而是为了在造轮子的过程中熟悉其工艺，总结轮子特点，更好的使用轮子。</p>
+<p>如果说写一个完整的PHP框架，那需要掌握的PHP知识点非常多，像设计模式、迭代器、事件与钩子等等，还有许多基础知识的灵活应用。我自认为这些还无法完全掌控，所以我的步骤是先自己搭建一个骨架，然后参考借鉴不同的PHP框架的特点，将其慢慢完善。因为工作原因，而且晚上还要补算法、网络等编程基础，PHP框架部分可能只有周末有时间更新，我会在进行框架功能更新之后，总结使用的知识点，更新博文。</p>
+<p>首先放上框架的目前源码：<span style="font-size: 18px;"><strong><span style="color: #ff0000;"><a href="https://github.com/zhenbianshu/sqier"><span style="color: #ff0000;">GITHUB/zhenbianshu</span></a></span></strong></span></p>
+<hr />
+<h1>框架整体</h1>
+<p>首先自己总结一下PHP的MVC框架的工作流程:</p>
+<p>简单来说，它以一个入口文件来接受请求，选择路由，处理请求，返回结果。</p>
+<p>当然，几句话总结完的东西实际上要做的工作很多，PHP框架会在每次接受请求时，定义常量，加载配置文件、基础类，根据访问的URL进行逻辑判断，选择对应的（模块）控制器和方法，并且自动加载对应类，处理完请求后，框架会选择并渲染对应的模板文件，以html页面的形式返回响应。在处理逻辑的时候，还要考虑到错误和异常的处理。</p>
+<p>1、作为MVC框架，一定要有一个唯一的入口文件来统领全局，所有的访问请求都会首先进入这个入口文件，如我框架根目录的index.php，在里面，我定义了基本文件夹路径，当前环境，并根据当前环境定义错误报告的级别。</p>
+<p>2、PHP中加载另外的文件，使用require和include,它们都是将目标文件内容加载到当前文件内，替换掉require或include语句，require是加载进来就执行，而include是加载进来在需要的时候执行，而它们的_once结构都是表示在写多次的时候只执行一次。</p>
+<p>3、框架内的配置变量等使用专用的配置文件来保存，这里我仿照了TP里的数组返回法，用了一个compileConf()函数来解析数组，将数组的键定义为常量，值为数组的值。</p>
+<pre><code>if (!function_exists('compile_conf')) {
+    function compileConf($conf) {
+        foreach ($conf as $key =&gt; $val) {
+        if(is_array($val)){
+             compileConf($val);
+            }else{
+            define($key, $val);
+            }
+        }
+     }
+ }
+ compileConf(require_once CONF_PATH.'config.php');
+</code></pre>
+<hr />
+<h1>命名空间和自动加载</h1>
+<p>为什么把命名空间和自动加载放到一块说呢？</p>
+<p>在一个PHP项目中，类特别多的时候，如果类名重复的话就会造成混乱，而且相同文件夹内也不能存在同名的文件，所以这时候命名空间和文件夹就搭档出场了。文件夹就是一个一个的盒子，命名空间在我理解就像是一个标签，盒子对应标签。我们定义类时，把各种类用不同的盒子分别装好，并贴上对应的标签。而在自动加载类时，我们根据标签（命名空间）可以很轻易找到对应的盒子（文件夹）然后找到对应的类文件。</p>
+<p>而类的自动加载，我们知道的__autoload()魔术函数，它会在你实例化一个当前路径找不到的对象时自动调用，根据传入的类名，在函数体内加载对应的类文件。</p>
+<p>现在我们多用spl_autoload_register()函数，它可以注册多个函数来代替__autoload函数的功能，我们传入一个函数名为参数，spl_autoload_register会将这个函数压入栈中，在实例化一个当前路径内找不到的类时，系统将会将函数出栈依次调用，直到实例化成功。</p>
+<pre><code>spl_autoload_register('Sqier\Loader::autoLoad');
+
+class Loader {
+public static function autoLoad($class) {
+    //如果有的话,去除类最左侧的\
+    $class = ltrim($class, '\\');
+    //获取类的路径全名
+    $class_path = str_replace('\\', '/', $class) . EXT;
+    if (file_exists(SYS_PATH . $class_path)) {
+        include SYS_PATH . $class_path;
+        return;
+    }
+    if (file_exists(APP_PATH . $class_path)) {
+        include APP_PATH . $class_path;
+        return;
+    }
+}
+</code></pre>
+<p>现在Loader类还是一个简单的类，待以后慢慢完善。</p>
+<hr />
+<h1>路由选择</h1>
+<p>接下来就是路由选择了，其本质是根据当前定义的全局URL模式选择合适的方法来分析传入的URI，加载对应的类，并实现对应的方法。</p>
+<pre><code>class Router {
+public static $uri;
+
+public static function bootstrap() {
+    self::$uri = $_SERVER['REQUEST_URI'];
+    switch (URL_MODE) {
+        case 1: {
+            self::rBoot();
+            break;
+        }
+        default: {
+            self::rBoot();
+        }
+    }
+}
+
+public static function rBoot() {
+    $router = isset($_GET['r']) ? explode('/', $_GET['r']) : [
+        'index',
+        'index'
+    ];
+    $cName = 'Controller\\' . ucfirst($router[0]);
+    $aName = isset($router[1]) ? strtolower($router[1]) . 'Action' : 'indexAction';
+    $controller = new $cName();
+    $controller-&gt;$aName();
+    }
+}
+</code></pre>
+<p>这样，我在地址栏输入 zbs.com/index.php?r=index/login 后，系统会自动调用/app/Controller/Index.php下的login方法。完成了这么一个简单的路由。</p>
+<hr />
+<h1>后续</h1>
+<p>接下来我会优化现有的工具类，添加显示层，添加数据库类，还会将一些别的框架里非常cool的功能移植进来~</p>
+<p>待续...</p>

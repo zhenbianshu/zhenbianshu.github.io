@@ -1,0 +1,51 @@
+---
+layout: post
+title: "用memoization优化递归算法[JS/PHP实现]"
+date: 2015-10-31 18:00:06 +0800
+comments: true
+---
+
+<p>递归函数，通过把一个大而复杂问题简化为许多但规模较小的问题，以同一个相似模式来计算，降低了解题的难度；通过调用自身函数，极大地减少了函数代码量的优点而为开发者喜爱。但因其不断调用自身函数开辟新栈，且大量传入同样参数，得到同样的结果，重复同一行为，也会浪费大量的内存。</p>
+<p>以经典问题，斐波那契数列为例：</p>
+<p>斐波那契数列指的是这样一个数列：&nbsp;0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233，377，610，987，1597，2584，4181，6765，10946，17711，求其第N项的值。</p>
+<p>对数列进行分析，我们发现，从自三项开始，第N项的值就等于其前两项之和，即第N-1和第N-2项的和。所以我们可以这样写func(n)=func(n-1)+func(n-2)</p>
+<p>代码如下：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #008080;">1</span> <span style="color: #0000ff;">function</span><span style="color: #000000;"> fibonacci(n){
+</span><span style="color: #008080;">2</span>     <span style="color: #0000ff;">if</span>((n==0)||(n==1<span style="color: #000000;">)){
+</span><span style="color: #008080;">3</span>         <span style="color: #0000ff;">return</span><span style="color: #000000;"> n;
+</span><span style="color: #008080;">4</span>     }<span style="color: #0000ff;">else</span><span style="color: #000000;">{
+</span><span style="color: #008080;">5</span>     　　<span style="color: #0000ff;">return</span> fibonacci(n-1)+fibonacci(n-2<span style="color: #000000;">);//调用自身函数实现递归
+</span><span style="color: #008080;">6</span> <span style="color: #000000;">    }
+</span><span style="color: #008080;">7</span> }</pre>
+</div>
+<p>分析代码我们发现，计算第N项的值总要计算第0项或第1项等较小的项的值，且会进行多次运算，结果相同。在此函数内，其边界项（0、1项）简便，若是进行边界项复杂的函数，内存会大量浪费。</p>
+<p>memoization的思想是通过定义一个数组，用来存放计算过的数据，在需要的时候直接从数组中取出，而不必再次计算，从而省去大量不必要的动作。</p>
+<p>以下是JS实现方式：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">var</span> fibonacci=<span style="color: #0000ff;">function</span><span style="color: #000000;">(n){
+    </span><span style="color: #0000ff;">var</span> cache=<span style="color: #000000;">[];//定义一个空数组用来存放计算好的数据
+　　</span><span style="color: #0000ff;">if</span>((n==0)||(n==1<span style="color: #000000;">)){
+　　　　</span><span style="color: #0000ff;">return</span><span style="color: #000000;"> n;
+　　}</span><span style="color: #0000ff;">else</span><span style="color: #000000;">{
+　　　　cache[n</span>-1]=cache[n-1]||fibonacci(n-1<span style="color: #000000;">);//应用||或运算符&ldquo;短路&rdquo;的特性，若在数组中找到其值，则直接使用数组内的值，若没有，再进行计算，并将值存入数组
+　　　　cache[n</span>-2]=cache[n-2]||fibonacci(n-2<span style="color: #000000;">);
+　　　　</span><span style="color: #0000ff;">return</span> cache[n-1]+cache[n-2<span style="color: #000000;">];//返回数组中的值
+　　}
+}</span></pre>
+</div>
+<p>由上可以看出，在计算过一次后，数据被存入数组，再次调用时便会优先找到数组内的值而免于大量计算，从而提升效率。</p>
+<p>以下是PHP实现（其实差不多。。。）</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">function</span> fibonacci(<span style="color: #800080;">$n</span><span style="color: #000000;">){
+　　</span><span style="color: #800080;">$cache</span>=<span style="color: #000000;">[];
+　　</span><span style="color: #0000ff;">if</span>((<span style="color: #800080;">$n</span>==0)||(<span style="color: #800080;">$n</span>==1<span style="color: #000000;">)){
+　　　　</span><span style="color: #0000ff;">return</span> <span style="color: #800080;">$n</span><span style="color: #000000;">;
+　　}</span><span style="color: #0000ff;">else</span><span style="color: #000000;">{
+　　　　cacehe[</span><span style="color: #800080;">$n</span>-1]=cache[<span style="color: #800080;">$n</span>-1]||fibonacci(<span style="color: #800080;">$n</span>-1<span style="color: #000000;">);
+　　　　cacehe[</span><span style="color: #800080;">$n</span>-2]=cache[<span style="color: #800080;">$n</span>-2]||fibonacci(<span style="color: #800080;">$n</span>-2<span style="color: #000000;">);
+　　　　</span><span style="color: #0000ff;">return</span> cache[<span style="color: #800080;">$n</span>-1]+cache[<span style="color: #800080;">$n</span>-2<span style="color: #000000;">];
+　　}
+}</span></pre>
+</div>
+<p>开始总结笔记了，如有错误，请各位不吝指正，谢谢。</p>

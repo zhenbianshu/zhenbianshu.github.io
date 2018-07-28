@@ -1,0 +1,114 @@
+---
+layout: post
+title: "PHP模拟发送POST请求之二、用PHP和JS处理URL信息"
+date: 2015-11-02 18:00:07 +0800
+comments: true
+---
+
+<p>明白了HTTP请求的头信息后，我们还需要对请求地址有所了解。再者，HTTP&nbsp;GET请求是靠URL实现的，所以了解URL的构造，处理URL的重要性不言而喻。</p>
+<p>在PHP中我们用parse_url()函数来处理URL信息。</p>
+<p><span style="color: #333333; line-height: 1.5;">其函数原型如下：</span></p>
+<blockquote>
+    <p>array&nbsp;parse_url&nbsp;(&nbsp;string&nbsp;$url&nbsp;[，URL_COSTANT])</p>
+    <p><span style="color: #000000; line-height: 1.5; background-color: initial;">本函数解析一个&nbsp;URL&nbsp;并返回一个关联数组，包含在&nbsp;URL&nbsp;中出现的各种组成部分。</span></p>
+    <p style="color: #000000;">对严重不合格的&nbsp;URL，parse_url()&nbsp;可能会返回&nbsp;FALSE&nbsp;并发出&nbsp;E_WARNING。否则会返回一个关联数组，其组成部分为（至少有一个）</p>
+</blockquote>
+<p>其正确的返回值如下：</p>
+<div class="cnblogs_code">
+<pre> scheme <span style="color: #000000;"> http 协议信息
+
+ host 　　主机信息
+
+ port  　端口号
+
+ user  　用户名
+
+ pass  　密码
+
+ path  站内路径
+
+ query </span> 在问号 ?<span style="color: #000000;"> 之后的查询信息
+
+ fragment </span> 在散列符号 <span style="color: #008000;">#</span><span style="color: #008000;"> 之后 锚点信息 Hash信息</span></pre>
+</div>
+<p>下面是一个典型的URL字符串，我们对其用parse_url()解析，并输出其结果数组。</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$url</span>='https://zbs:mypass@www.baidu.com:8080/home/index.html?gender=male&amp;write=code#anchor'<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$arr</span>=<span style="color: #008080;">parse_url</span>(<span style="color: #800080;">$url</span><span style="color: #000000;">);
+
+</span><span style="color: #0000ff;">array</span> (size=8<span style="color: #000000;">)
+
+</span>'scheme' =&gt; <span style="color: #0000ff;">string</span> 'https'
+
+'host' =&gt; <span style="color: #0000ff;">string</span> 'www.baidu.com'
+
+'port' =&gt; int 8080
+
+'user' =&gt; <span style="color: #0000ff;">string</span> 'zbs'
+
+'pass' =&gt; <span style="color: #0000ff;">string</span> 'mypass'
+
+'path' =&gt; <span style="color: #0000ff;">string</span> '/home/index.html'
+
+'query' =&gt; <span style="color: #0000ff;">string</span> 'gender=male&amp;write=code'
+
+'fragment' =&gt; <span style="color: #0000ff;">string</span> 'anchor'</pre>
+</div>
+<p>另外，我们还可以对第二个参数赋值，指定要返回的URL部分，对应的URL_CONST取值如下：</p>
+<p>scheme:PHP_URL_SCHEME,&nbsp;</p>
+<p>host:PHP_URL_HOST,&nbsp;</p>
+<p>port:PHP_URL_PORT,&nbsp;</p>
+<p>user:PHP_URL_USER,&nbsp;</p>
+<p>pass:PHP_URL_PASS,&nbsp;</p>
+<p>path:PHP_URL_PATH,&nbsp;</p>
+<p>query:PHP_URL_QUERY,</p>
+<p>fragment:PHP_URL_FRAGMENT.</p>
+<p>例如我们要指定返回地址的查询字段信息：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$url</span>='https://zbs:mypass@www.baidu.com:8080/home/index.html?gender=male&amp;write=code#anchor'<span style="color: #000000;">;
+
+</span><span style="color: #800080;">$arr</span>=<span style="color: #008080;">parse_url</span>(<span style="color: #800080;">$url</span>,PHP_URL_QUERY);<span style="color: #008000;">//</span><span style="color: #008000;">string '/home/index.html</span></pre>
+</div>
+<p>理解了如何拆分URL信息后，我们也更需要学会拼合URL信息，拼合URL信息有一个专门的函数http_build_url(),但此函数因其处理繁琐，一般较少使用，我们常用字符串来拼合URL，在处理较多的查询信息(query_string)时，我们会用http_build_query()函数。</p>
+<p>http_build_query()函数能帮我们将一个关联数组快速拼合成一个查询字符串，它甚至可以将一个对象分析拼合为一个查询字符串，但要注意，它只能保留修饰符为"public"的"属性"，其余信息将会被舍弃。</p>
+<p>例：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$info</span>=['run'=&gt;'10km','eat'=&gt;'3kg'<span style="color: #000000;">];
+
+</span><span style="color: #008080;">var_dump</span>(<span style="color: #008080;">http_build_query</span>(<span style="color: #800080;">$info</span>));<span style="color: #008000;">//</span><span style="color: #008000;">string 'run=10km&amp;eat=3kg'</span>
+
+<span style="color: #0000ff;">class</span><span style="color: #000000;"> Msg{
+
+　　</span><span style="color: #0000ff;">public</span> <span style="color: #800080;">$attr_public</span>="value_public"<span style="color: #000000;">;
+
+　　</span><span style="color: #0000ff;">protected</span> <span style="color: #800080;">$attr_protected</span>="value_protected"<span style="color: #000000;">;
+
+　　</span><span style="color: #0000ff;">private</span> <span style="color: #800080;">$attr_private</span>="value_private"<span style="color: #000000;">;
+
+　　</span><span style="color: #0000ff;">function</span><span style="color: #000000;"> foo(){
+
+　　　　</span><span style="color: #0000ff;">echo</span> "foo"<span style="color: #000000;">;
+
+　　}
+
+}
+
+</span><span style="color: #800080;">$msg</span>=<span style="color: #0000ff;">new</span><span style="color: #000000;"> Msg();
+
+</span><span style="color: #008080;">var_dump</span>(<span style="color: #008080;">http_build_query</span>(<span style="color: #800080;">$msg</span>));<span style="color: #008000;">//</span><span style="color: #008000;">string 'attr_public=value_public'</span></pre>
+</div>
+<hr />
+<p>&nbsp;</p>
+<p>另：JS获取当前url信息：</p>
+<p>Location&nbsp;对象是&nbsp;Window&nbsp;对象的一个部分，可通过&nbsp;window.location&nbsp;属性来访问，它包含了有关当前&nbsp;URL&nbsp;的信息。</p>
+<p>Location&nbsp;对象属性</p>
+<p>属性 　　　　　　描述</p>
+<p>hash 　　　　URL锚点信息</p>
+<p>host 　　　　主机名和当前&nbsp;URL&nbsp;的端口号</p>
+<p>hostname 　当前URL的主机名</p>
+<p>href 　　　　完整的URL</p>
+<p>pathname &nbsp; &nbsp;当前URL的路径部分</p>
+<p>port 　　 &nbsp; &nbsp; &nbsp;当前URL的端口号</p>
+<p>protocol 　　当前URL的协议</p>
+<p>search 　　 &nbsp;&nbsp;查询字符串</p>

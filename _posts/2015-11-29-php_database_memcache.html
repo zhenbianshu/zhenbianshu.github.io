@@ -1,0 +1,84 @@
+---
+layout: post
+title: "PHP中的数据库二、memcache"
+date: 2015-11-29 18:00:08 +0800
+comments: true
+---
+
+<p>在一个高并发的web应用中，数据库存取瓶颈一直是个大问题，一旦达到某个极限，数据库很容易崩溃，但是如果我们把常用的数据放到内存中，在需要的时候从内存中取，不光读取速度快，而且节约数据库IO。</p>
+<hr />
+<h1>memcache简介</h1>
+<blockquote>
+    <p>Memcache是一个高性能的分布式的内存对象缓存系统，通过在内存里维护一个统一的巨大的hash表，它能够用来存储各种格式的数据，包括图像、视频、文件以及数据库检索的结果等。简单的说就是将数据调用到内存中，然后从内存中读取，从而大大提高读取速度。</p>
+</blockquote>
+<p>memcache的mem是内存(memory),cache是缓存，结合是内存缓存的意思。我们应用memcache时，读取数据先从memcache内读取，若查找不到再去数据库里查找，并将数据存入memcache，待下次查找时便能轻易找到。</p>
+<p>需要注意：</p>
+<ul>
+    <li>memcache是内存型的数据库 ，因为内存的关闭释放的特性，memcache也无法持久化存储内容；</li>
+    <li>memcache内部是分块存储，所以大于1M的数据也无法存储。</li>
+    <li>memcache依赖libevent库，安装前需确认已经安装了libevent库。</li>
+    <li>memcache是一个轻量级的内存型数据库，只支持key-value型的存储。</li>
+    <li>memcache中没有关于用户，密码的设置，所以在配置时要配置防火墙的端口限制连接，以达到安全的目的。</li>
+    <li>使用repcached也能轻易实现memcache的单master单slave主从复制。</li>
+</ul>
+<hr />
+<h1>memcache的应用场景</h1>
+<ul>
+    <li>存储大量不需要持久存储或数据库内已存在不会变动的数据。</li>
+    <li>读取数据非常频繁数据，要求小于1M。</li>
+    <li>数据类型简单的key-value型数据。</li>
+    <li>计算好的结果和渲染后的网页模板文件。</li>
+    <li>因其原子递增性，可以用来计数。</li>
+    <li>因为可以设置数据过期时间的特性，存储期限数据。不过需要注意，memcache会在分配的内存不足时以最近最少使用原则(LRU)重用内存，可能会导致信息提前被删除。</li>
+    <li>用memcache存储session信息，以达到多服务器session共享。需要配置：php.ini：</li>
+</ul>
+<hr />
+<pre><code>session.save_handler = memcache //设置session的储存方式为memcache
+memcache.hash_strategy = "consistent"//设置memcache的hash算法为一致性哈希算法。
+session.save_path = "tcp:/ip:port" //设置session储存的位置，多台memcache用逗号隔开。
+</code></pre>
+<hr />
+<h1>memcache服务器的安装</h1>
+<p>memcache的安装简单，服务器可以在其官网http://www.memcached.org/下载，解压后在其目录下运行./configure -prefix=/path编译，然后make / make test / make install 得到可以直接执行的二进制文件。</p>
+<p>使用./memcached命令即可开启服务器，其常用参数如下：</p>
+<ul>
+    <li>-p port 监听端口 (默认: 11211)</li>
+    <li>-d 以后台方式运行Memcached</li>
+    <li>-u username 运行Memcached的账户</li>
+    <li>-m n 最大的内存使用, 单位是MB，默认 64 MB</li>
+    <li>-c connections 最大连接数量, 默认是 1024</li>
+</ul>
+<hr />
+<h1>memcache的常用命令</h1>
+<p>用memcache客户端或telnet连接到memcache后，就可以对memcache进行操作了。</p>
+<p>memcache数据结构简单，所以命令行命令也很少，下面以一条常用命令来简析一下命令格式：</p>
+<p>add key flags expire_time length \r\n value</p>
+<p>flags：是否压缩/序列化，通常为0。</p>
+<p>expire_time：从存储后多久过期。以秒(s)为单位，最大为30天的长度，超过30天的长度被视为时间戳表示"到什么时候过期"，若设为0表示永不过期。</p>
+<p>length:value长度，输入长度回车之后，命令行会读取你接下来输入的length个字符。</p>
+<pre><code>set key flags expire_time length    //如果有值则覆盖原值，没有则新增，add在有值时会存储失败
+get key                             //获取key的值
+replace key flags expire_time length// 替换一个已存在的key
+append/preappend key flags expire_time length// 给key的value后面/前面添加新内容。
+preappend key flags expire_time length      // 给key的value前面添加新内容。
+inc/dec key [n]                         //key的值递增/递减1/[n]
+delete key                              //删除一个key
+flush_all [n]                           //[在n秒后]删除全部数据
+stats [options]                         //获取memcache[有关某一项]的详细信息
+</code></pre>
+<hr />
+<h1>PHP的memcache扩展及应用</h1>
+<p>在https://pecl.php.net/index.php搜索获取到所需的memcache扩展包。</p>
+<p>linux系统，直接挑选版本(推荐最新stable稳定版)下载，解压后在解压目录下用phpize工具产生configure文件，并用它安装，安装完成后在/php.ini中添加extension。具体可看我的博文<a href="http://www.cnblogs.com/zhenbianshu/p/5002189.html">linux下的PHP中的最后一节</a>。</p>
+<p>windows下要点击链接右边的&ldquo;windows logo DLL&rdquo;链接，并在新打开的页面中，按照版本、32位/64位、线程安全/非线程安全来选择自己所需要的扩展，具体选项可以在phpinfo();页面看到。下载完成后，将其放入phppath/ext/目录下，然后在php.ini中添加extension=php_memcacache.dll;重启服务器完成安装。</p>
+<p>在phpinfo()页面中看到memcache扩展后，说明安装成功，我们就可以在php脚本中使用关于memcache的类函数库了。</p>
+<p>在手册中我们可以找到许多关于php的memcache扩展的使用，以下是一个典型的memcache使用流程。</p>
+<pre><code>$m=new Memcache();
+$m-&gt;connect($host,$port);
+$m-&gt;add($key,$value[,flags,$expire_time]);
+$content=$m-&gt;get($key);
+$m-&gt;close();
+</code></pre>
+<p>这是一个简单的memcache连接程序，在进行memcache分布式存储时，还需要用到$memcache-&gt;addServer()向memcache集群中添加服务器。</p>
+<p>此外，还有get(),set(),flush(),delete()等方法，用法都大同小异，在手册上也能找得到，而且十分清晰。说到手册，推荐一个我正在用的，很不错。地址：http://pan.baidu.com/s/1mgCkvIo</p>
+<p>如果您觉得本博文对您有帮助，您可以推荐或关注我，如果您有什么问题，可以在下方留言讨论，谢谢。</p>

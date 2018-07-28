@@ -1,0 +1,167 @@
+---
+layout: post
+title: "PHP中的数据库四、mongodb"
+date: 2015-12-02 18:00:08 +0800
+comments: true
+---
+
+<p>传统数据库中，我们要操作数据库数据都要书写大量的sql语句，而且在进行无规则数据的存储时，传统关系型数据库建表时对不同字段的处理也显得有些乏力,mongo应运而生，而且ajax技术的广泛应用，json格式的广泛接受，也使得mongo更贴近开发人员。</p>
+<hr />
+<h1>mongo简介及应用场景</h1>
+<blockquote>
+    <p>MongoDB是一个面向文档的非关系型数据库(NoSQL)，使用json格式存储。Mongo DB很好的实现了面向对象的思想(OO思想),在Mongo DB中 每一条记录都是一个Document对象。Mongo DB最大的优势在于所有的数据持久操作都无需开发人员手动编写SQL语句,直接调用方法就可以轻松的实现CRUD操作。</p>
+</blockquote>
+<p>mongo能应用在如下场景：</p>
+<ul>
+    <li>存储大尺寸、低价值的数据</li>
+    <li>json及对象类型数据</li>
+    <li>网站缓存数据</li>
+    <li>评论、子评论类有明显从属关系数据</li>
+    <li>多服务器数据，其内置的MapReduce很容易现实全局遍历。</li>
+</ul>
+<hr />
+<h1>安装和使用mongodb</h1>
+<p>我们在官网 https://www.mongodb.org/ 上可以下载到其最新稳定版本 ，mongo是官方已经编译好的，解压后即可使用其命令都在bin目录下。</p>
+<p>使用前首先配置mongo.conf文件</p>
+<pre><code>port=xxxxx                                  //代表端口号，如果不指定则默认为 27017
+dbpath=/usr/local/mongodb/db                //数据库路径
+logpath=/usr/local/mongodb/logs/mongodb.log //日志路径
+logappend=true                              //日志文件自动累加，而不是覆盖
+fork=ture                                   //以守护进程方式创建
+</code></pre>
+<p>数据库和数据表都可以直接创建，即不用切换，直接使用，使用时即创建，mongo里还可以直接写js脚本，可直接运行，mongo中如果不指定_id字段，mongo会自动添加一个。</p>
+<hr />
+<h1>mongo的各种命令</h1>
+<p>mongo的命令是其精髓，这些十分复杂的命令集合在一块，使得mongo的查询变得绚丽而高效。mongo内的每个表称作一个collection(集合)，使用命令类似于MySQL，切换到数据库内直接对每一个collection操作。其命令由方法(<strong>func()</strong>)、查询体（<strong>写在{}里<strong>）和操作符(</strong>由$开头</strong>)组成。</p>
+<h3>基本命令</h3>
+<pre><code>show dbs                                //查看数据库
+use dbname                              //切换到数据库
+db.createCollection('collection')       //创建数据表
+db.collection.drop()                    //删除数据表
+db.dropDatabase()                       //删数据库
+db.collection.insert({data})            //插入数据
+db.collection.find()                    //显示数据表内全部内容
+</code></pre>
+<h3>查询体</h3>
+<pre><code>{key.attr.attr:value}                                       //普通式
+{key:{$ne|$gt|$gte|$lt|$lte|$in|$nin|$all:value}}           //key满足 $oper value的值
+{$or|$and|$not|$nor:[{key1:{$gt:value}},{key2:{$ne:value}}]} //用$oper同时限定key1,key2的条件
+{key:{$mod{8,2}}}                                           //取出key对8取余为2的值。
+{key:{$exist:1}}                                            //取出key列存在的值。
+{key:{$type:String|Double|Array|Date|Object|Boolean|......}}//查询key类型为type的列
+{key:{$regex:/pattern/}}                                    //通过正则查询，效率较低
+{$where:'this.attr.express.....'}                           //直接用where语句，二进制转为JS运算，较慢
+</code></pre>
+<h3>find()方法增强</h3>
+<pre><code>db.collection.find(query,{要取出的列:1,不需要的列:0})
+db.collection.find(query).skip(跳过的行数).limit(限制信息条数);
+db.collection.find(query).explain()         //与MYSQL的解释语句一样。
+db.collection.remove(query,[justone])   //如不指定query,全部删除；[justone]默认为false意思是查询到多个，但只删一个。
+</code></pre>
+<h3>update语句</h3>
+<pre><code>db.collection.update(query,{key:newvalue})   //注意：新值会覆盖旧值,即数据只剩下语句中定义的key
+db.collection.update(query,
+{
+    $set:{key:newvalue},
+    $unset:{key:value},
+    $rename:{key:value},
+    $inc:{key:value},
+    ......
+},
+{
+    multi:true,     //改变所有符合条件的，默认为false
+    upsert:true     //没有的话刚添加，默认为false
+}
+)
+</code></pre>
+<h3>游标</h3>
+<pre><code>var cursorName=db.collection.fund(query,...)[.skip(num).limit(num)] //创建游标
+cursorName.hasNext()                                                //判断是否有下一个
+printjson(cursorName.next())                                        //输出游标的下一个指向值
+cursorName.forEach(function(Obj){process Obj})                      //遍历操作游标
+</code></pre>
+<h3>索引</h3>
+<pre><code>db.collection.getIndexes()                  //查看索引
+db.collection.ensureIndex({key:1/-1[,key.attr:1/-1]},{unique:1(是否唯一)},{sparse:1(是否非空)})// 添加正序/倒序索引
+db.collection.dropIndex({key:1/2})          //删除索引
+db.collection.reIndex()         //重建用了很多出现杂乱的索引
+</code></pre>
+<h3>MapReduce</h3>
+<p>MapReduce是mongo中内置的一个非常强大的遍历操作工具，使用它需要实现它的map和reduce两个函数</p>
+<pre><code>db.runCommand(
+           {
+             mapReduce: collection,             //要操作的数据表
+             map: function(){emit(key1,key2)},  //对key1和key2进行数据映射
+             reduce: function(key,value){},     //对key值和数据组value进行操作
+             out: &lt;output&gt;,
+             query: &lt;document&gt;,
+             sort: &lt;document&gt;,
+             limit: &lt;number&gt;,
+             finalize: &lt;function&gt;,
+             scope: &lt;document&gt;,
+             jsMode: &lt;boolean&gt;,
+             verbose: &lt;boolean&gt;
+           }
+         )
+</code></pre>
+<p>更多更详细的命令可以在mongo的中文社区 http://docs.mongoing.com/manual-zh/ 找到。</p>
+<hr />
+<h1>mongo的用户、数据导入导出和集群</h1>
+<h3>用户管理</h3>
+<p>MongoDB默认不开启授权。可以在开启服务器时添加 --auth 或者 --keyFile 选项开启授权。使用配置文件的话，使用 security.authorization 或 security.keyFile 设置。</p>
+<p>MongoDB提供 自带角色, 每一个角色都为一种常见用例提供一个明确的作用。例如 read, readWrite, dbAdmin, 和 root 等角色。我们通过创建用户，创建角色，给用户分配/回收不同的角色来进行用户管理。</p>
+<p>添加角色时要先在admin数据库中添加一个管理员角色，然后使用管理员角色在每个库添加不同的角色。</p>
+<pre><code>use admin;(切换到admin数据库，对此库操作)
+db.createUser(
+  {
+    user: "username",
+    pwd: "password",
+    roles:
+    [
+      {
+        role: "userAdminAnyDatabase",
+        db: "admin"
+      }
+    ]
+  }
+)
+use database;
+db.auth('username','passwd');用超级管理员用户登陆后，整个mongo数据库皆可存取。
+</code></pre>
+<h3>数据导入导出</h3>
+<p>我们使用mongo自带的工具进行导入导出，在mongo/bin目录下，最好导出csv格式，便于数据交换。</p>
+<pre><code>./mongoexport -d dataname -c tablename -f key1,key2 -q 'query' -o ainname --csv//导出数据，默认为json格式
+./mongoimport -d dataname -c tablename --type json --file ./path //导入数据，默认为json格式
+</code></pre>
+<h3>mongo数据库集群</h3>
+<ol>
+    <li>打开mongod时添加选项 --replSet replname;</li>
+    <li>
+        <p>在mongo客户端连接上一个mongod进程，进入admin数据库，然后声明mongoconf变量：</p>
+        <pre><code>use admin;
+var rsconf={_id:'replname',members[{_id:0,host:'xxx'},{_id:1,host:'xxy'}]};
+</code></pre>
+    </li>
+    <li>
+        <p>用rs.initiatee(rsconf);来初始化集群，mongo会自动将id号小的设为primary,其他的mongod进程为secondary。</p>
+    </li>
+    <li>连接secondary进程，使用slaveOk()函数，来初始化从进程。</li>
+</ol><hr />
+<h1>PHP中操作mongo数据库</h1>
+<p>我们先为php添加mongo扩展(方法可看<a href="http://www.cnblogs.com/zhenbianshu/p/4999588.html">linux下的PHP </a>)。然后，我们便可以在脚本中使用mongo类函数库了。</p>
+<p>不同于其他的类库只有一个核心类，mongo有四个类，分别是：</p>
+<ul>
+    <li>Mongo类，基础类，拥有连接、关闭连接、对全局数据库的操作方法。</li>
+    <li>mongoDB类，邮Mongo类通过selectDB()方法得到，拥有表级的操作方法。</li>
+    <li>MongoCollection类，一般由Mongo-&gt;dbname-&gt;collection或直接用MongoDB类和数据库名实例化得到，拥有对数据的基本操作。</li>
+    <li>MongoCursor类，由MongoCollection通过find()方法得到，拥有普通的游标遍历操作。</li>
+</ul>
+<p>以下是一个典型的mongo操作：</p>
+<pre><code>$mongo=new Mongo();
+$mongo-&gt;connect('host',port);
+$collection=$mongo-&gt;dbname-&gt;collection;
+$cursor=$collection-&gt;find();
+$cursor-&gt;operate();
+$mongo-&gt;close();
+</code></pre>
+<p>如果您觉得本博文对您有帮助，您可以推荐或关注我，如果您有什么问题，可以在下方留言讨论，谢谢。</p>

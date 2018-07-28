@@ -1,0 +1,100 @@
+---
+layout: post
+title: "LINUX下的PHP"
+date: 2015-11-27 18:00:08 +0800
+comments: true
+---
+
+<p>由于linux系统的稳定性，大部分的PHP服务器都被部署在linux上，而且像redis等扩展在linux能得到更好的支持，所以对于PHP程序员来说，使用linux的功底也相当重要，接下来总结一下我从一开始在linux下安装配置linux的心得。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">linux系统安装</span></strong></p>
+<p>首先是选择linux操作系统，我使用的是Cent&nbsp;OS&nbsp;6.7 ，它类似红帽系统，简单易接触，而且开源免费。</p>
+<blockquote>
+ <p>CentOS（Community&nbsp;Enterprise&nbsp;Operating&nbsp;System，中文意思是：社区企业操作系统）是Linux发行版之一，它是来自于Red&nbsp;Hat&nbsp;Enterprise&nbsp;Linux(小红帽)依照开放源代码规定释出的源代码所编译而成。由于出自同样的源代码，因此有些要求高度稳定性的服务器以CentOS替代商业版的Red&nbsp;Hat&nbsp;Enterprise&nbsp;Linux使用。两者的不同，在于CentOS并不包含封闭源代码软件。</p>
+</blockquote>
+<p>然后要准备一台linux机器，虚拟机是最好的选择了，它便于安装，随开随用。</p>
+<p>虚拟机管理我推荐VM&nbsp;ware&nbsp;station，安装管理都方便，而且功能强大。用过小巧的virtual&nbsp;box，在win7下安装要改theme主题文件，辛苦装好的环境因为未知原因(兼容问题排除后，猜测是BIOS设置的问题，可参考)打不开虚拟机而放弃后，终于选择了VM，VM下安装linux的教程网上到处是，还有全程配图版。</p>
+<p>说一下要注意的地方吧：虚拟机配置选择&ldquo;<span style="color: #ff0000;"><strong>桥接模式</strong></span>&rdquo;，这样，虚拟机和主机就在同一个IP段下，可以很轻松地互相访问，VM下如图:</p>
+<p><img src="/images/819496-20151127083017218-1918193290.png" alt="" /></p>
+<p>然后是我们经常要遇到的问题网络配置、和虚拟之间的交互、yum配置。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">网络配置</span></strong></p>
+<p>vi /etc/sysconfig/network-scripts/ifcfg-eth0&nbsp;按需求修改以下信息</p>
+<div class="cnblogs_code">
+<pre>DEVICE=eth0 <span style="color: #008000;">//</span><span style="color: #008000;">网卡序号</span>
+<span style="color: #000000;">
+NAME</span>=<span style="color: #800000;">"</span><span style="color: #800000;">System eth0</span><span style="color: #800000;">"</span><span style="color: #008000;">//</span><span style="color: #008000;">设备名</span>
+<span style="color: #000000;">
+TYPE</span>=Ethernet<span style="color: #008000;">//</span><span style="color: #008000;">设备类型</span>
+<span style="color: #000000;">
+HWADDR</span>=<span style="color: #800080;">00</span>:0C:<span style="color: #800080;">29</span>:C9:<span style="color: #800080;">81</span>:D7<span style="color: #008000;">//</span><span style="color: #008000;">系统检测到的硬件ID</span>
+<span style="color: #000000;">
+ONBOOT</span>=yes <span style="color: #008000;">//</span><span style="color: #008000;">是否开机运行</span>
+<span style="color: #000000;">
+BOOTPROTO</span>=static <span style="color: #008000;">//</span><span style="color: #008000;">获取IP方式，有static(静态方式)、dhcp(DHCP协议)、none(不指定)</span>
+<span style="color: #000000;">
+IPADDR</span>=<span style="color: #800080;">192.168</span>.<span style="color: #800080;">1.66</span> <span style="color: #008000;">//</span><span style="color: #008000;">IP地址</span>
+<span style="color: #000000;">
+NETMASK</span>=<span style="color: #800080;">255.255</span>.<span style="color: #800080;">255.0</span> <span style="color: #008000;">//</span><span style="color: #008000;">子网掩码</span>
+<span style="color: #000000;">
+GATEWAY</span>=<span style="color: #800080;">192.168</span>.<span style="color: #800080;">1.1</span><span style="color: #008000;">//</span><span style="color: #008000;">网关</span></pre>
+</div>
+<p>这样配置好之后，如果linux系统有桌面系统的话就可以直接用浏览器访问外网了。还需要进行主机和虚拟机之间的连通，可以在windows的cmd命令行中运行ipconfig命令来获取当前ip信息，然后可以在主机和虚拟机之间使用ping命令测试连接状态。</p>
+<p><strong>ping&nbsp;192.168.1.xxx&nbsp;</strong></p>
+<p>注意，虚拟机可能会用防火墙屏蔽80端口，导致虚拟机能访问自己，两者也能相互ping通，虚拟机也能访问主机，但主机却无法访问虚拟机的网站，通过修改防火墙设置或关闭防火墙能解决这一问题。</p>
+<div class="cnblogs_code">
+<pre>/etc/init.d/iptables -I INPUT -p tcp --dport <span style="color: #800080;">80</span> -j ACCEPT <span style="color: #008000;">//</span><span style="color: #008000;">修改不屏蔽80端口。</span>
+
+/etc/init.d/iptables stop <span style="color: #008000;">//</span><span style="color: #008000;">关闭防火墙</span></pre>
+</div>
+<p>这样在配置好环境之后，就可以在主机和虚拟机之间互相访问了。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">主机环境下操作虚拟机</span></strong></p>
+<p>配置好之后，便可以用工具来解决虚拟机和主机之间切换复制信息不便的问题了，这里我使用<strong><span style="color: #ff0000;">Secure&nbsp;CRT</span></strong>来进行主机与虚拟机之间的连接。</p>
+<p>安装打开之后，点击quick connect按钮新增一个连接操作，如下图：</p>
+<p>&nbsp;<img src="/images/819496-20151127083452452-1080903006.png" alt="" /></p>
+<p>然后输入用户密码，保存。</p>
+<p>还要注意使用Secure&nbsp;CRT时的编码问题，默认情况下，虚拟机的中文会显示乱码&nbsp;，需要以下配置：</p>
+<p><img src="/images/819496-20151127083533327-2025402274.png" alt="" /></p>
+<p>然后让虚拟机进入后台运行状态，在VM界面，点击关闭虚拟机窗口，会弹出如下菜单。</p>
+<p>&nbsp;<img src="/images/819496-20151127083549452-1331392541.png" alt="" /></p>
+<p>选择<strong><span style="color: #ff0000;">后台运行</span></strong>，这样就可以不用管虚拟机窗口，尽情地用Secure CRT在window下操作虚拟机了。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt;">yum配置</span></strong></p>
+<blockquote>
+ <p>Yum（全称为&nbsp;Yellow&nbsp;dog&nbsp;Updater,&nbsp;Modified）是一个在Fedora和RedHat以及CentOS中的Shell前端软件包管理器。基于RPM包管理，能够从指定的服务器自动下载RPM包并且安装，可以自动处理依赖性关系，并且一次安装所有依赖的软件包，无须繁琐地一次次下载、安装。</p>
+</blockquote>
+<p>yum一般会在系统安装时自动安装，如果使用yum命令时提示找不到命令，那就在光盘的Packages文件夹里搜索yum安装包安装。</p>
+<p>使用yum之前要先配置yum源。</p>
+<p>切换到/etc/yum.repos.d/目录下，先将原来的yum源备份一个，然后用wget命令获取一个yum源。</p>
+<div class="cnblogs_code">
+<pre>cd /etc/<span style="color: #0000ff;">yum</span>.repos.d/
+
+<span style="color: #0000ff;">mv</span> CentOS-Base.repo CentOS-<span style="color: #000000;">Base.repo.bak
+
+</span><span style="color: #0000ff;">wget</span> http:<span style="color: #008000;">//</span><span style="color: #008000;">mirrors.163.com/.help/CentOS6-Base-163.repo</span></pre>
+</div>
+<p>配置好后我们就可以用yum来安装所需的软件了，用yum源来安装必备库和编译软件 gd&nbsp;gd-devel&nbsp;libxml2-devel&nbsp;gcc&nbsp;gcc-c++&nbsp;zlib等</p>
+<p>用yum安装的软件会找不到安装目录，可以用用<span style="color: #ff0000;"><strong>rpm&nbsp;-ql&nbsp;packagename</strong></span>&nbsp;查询安装地址</p>
+<p>接下来安装mysql &nbsp;mysql-server&nbsp;安装好后记得用&nbsp;mysqladmin&nbsp;-u&nbsp;root&nbsp;password&nbsp;xxxx设置好root密码</p>
+<p>然后用<strong><span style="color: #ff0000;">wget命令+地址</span></strong> 下载php安装包，手动编译PHP时要注意:</p>
+<p>--with-apxs2=/usr/local/apache2/bin/apxs//将其编译为apache的核心。</p>
+<p>--enable-fpm&nbsp;//如果使用nginx服务器，此项要选,产生一个<strong><span style="color: #ff0000;">独立的PHP进程</span></strong>，在php/sbin/php-fpm，直接执行会产生一个端口号为9000的PHP进程。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">PHP添加扩展模块</span></strong></p>
+<p>扩展模块一般分为两部分：扩展服务器和php扩展。</p>
+<p>像mongo等扩展服务器是扩展的核心，要在各自的官网找到下载地址，用wget命令下载下来，然后解压安装，一般是官方编译好的可执行文件，直接复制到目标目录即可。</p>
+<p>而PHP扩展文件，则是一个函数库，通过函数库与扩展服务器连接并操作数据库，大家可以去PHP官方扩展仓库&nbsp;<span style="color: #ff0000;"><strong>https://pecl.php.net/index.php</strong></span>下载扩展。</p>
+<p>先将扩展包下载下来，然后解压，进入目录，用php/bin下的phpize运行一下（注意php用yum安装，找不到phpize，可用<strong><span style="color: #ff0000;">yum&nbsp;install&nbsp;php-devel来安装phpize</span></strong>），产生一个configure文件。</p>
+<p>再用<span style="line-height: 1.5;">./configure&nbsp;--prefix=/usr/local/...&nbsp;&ndash;with-php-config=/usr/local/php/bin/php-config&nbsp;命令编译</span></p>
+<p>最后make&nbsp;/&nbsp;make&nbsp;test&nbsp;/make&nbsp;install</p>
+<p>会得到一个形如/usr/local/php/lib/php/extensions/no-debug-non-zts-20131226/的地址，这个文件夹里存放着我们编译出来的PHP模块文件xxx.so(如同windows下的xxx.dll)</p>
+<p>然后修改/lib/php.ini文件，添加extension=/usr/local/php/lib/php/extensions/no-debug-non-zts-20131226/xxx.so将模块扩展加入。</p>
+<p>这样简单的PHP环境便搭建好了。</p>
+<p>&nbsp;</p>
+<p>如果您觉得本博文对您有帮助，您可以推荐或关注我，如果您有什么问题，可以在下方留言讨论，谢谢。</p>

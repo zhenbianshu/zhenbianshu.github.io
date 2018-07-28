@@ -1,0 +1,194 @@
+---
+layout: post
+title: "yii2开发后记"
+date: 2016-01-13 18:00:08 +0800
+comments: true
+---
+
+<p>前些天准备写一个自己的博客CMS，考虑PHP框架的时候想到了据说非常强大的yii，接触yii时发现有2.0版本，果断尝最鲜的。这么一尝试感觉入了坑了，yii2.0是2014年12月发布的，估计国内用的人比较少，资料比较少，遇到问题百度yii2.0查出来好多1.0版本的答案，只好去google看英文站。一个小问题没人提醒，又是STACK OVERFLOW又是自己翻源码，弄了一天多。。。可谓是吃尽了苦头。</p>
+<p>不过网站总算是做出来了，地址：<a title="枕边书" href="http://www.alwayscoding.cn">http://www.alwayscoding.cn</a>，以后博客在此站同步更新，而且，我也可以在上面肆无忌惮的放上自己喜欢的文章了~~另外源码也放在了github上，地址：<a title="SQBlog" href="https://github.com/zhenbianshu/blog-cms">https://github.com/zhenbianshu/blog-cms</a>,有想使用本CMS的我可以提供支持~最后自己也总结出来了下列的使用心得，准备入手yii2.0的可以看一下，留个爪。</p>
+<hr />
+<h1>基础总结</h1>
+<h3>1.修改默认控制器/方法</h3>
+<p>yii默认是site控制器，可以在web.php中设置$config中的'defaultRoute'='xxxx';使用自定义默认的控制器。也可以改写Yii::$app-&gt;defaultRoute属性。</p>
+<p>yii的默认方法是index，可以在vender/yiisoft/yii2/base/Controller.php 中进行初始设置，也可以在控制器中改写defaltAction='action'。</p>
+<h3>2.添加独立模块</h3>
+<p>yii可以在modules文件夹中添加自定义模块，添加完成后在web.php中的$config中的'modules'=[id=..class=...]设置模块的开关。</p>
+<p>模块一般用于一些独立的功能，像我站里的admin模块整体负责后台逻辑。</p>
+<h3>3.模型操作表设置</h3>
+<p>yii的模型有Model和ActiveRecord两种，Model类用来处理基本的业务逻辑，没有数据库相关方法，如果要操作同名数据表，请继承ActiveRecord类。</p>
+<p>我们用一个在models文件夹中的Operation.class里Operation类来继承yii\db\ActiveRecord来操作Operation表。</p>
+<p>如果要操作其他表，也可以重写public $tableName属性来设置。或改写其tableName方法（注意是静态方法） ： public static function tableName(){return 'tableName'}</p>
+<h3>4.视图层构成</h3>
+<p>yii的视图层使用.php文件，而且其内部的实现也多采用yii内置小部件的形式，如&lt;?= LinkPager::widget(['pagination'=&gt;$pagination]) ?&gt;来表示其分页类。</p>
+<p>而且，像input这样的小部件，用ActiveForm类来展现，yii会对每个自动加入ajax验证，其一般的小部件都放在yii\widget\里，我们还可以在此文件夹里构建自定义的小部件类。</p>
+<h3>5.布局模式</h3>
+<p>yii会默认开启布局模式，其布局模板为view中的layout中的main.php，我们可以在veder/yiisoft/yii2/web/controller.php基础类中public $layout属性修改模板文件的配置。</p>
+<p>我们还可以设置关闭或指定特定的layout：</p>
+<ul>
+    <li>控制器内控制 public $layout=false/'layout'</li>
+    <li>控制器成员方法内控制 $this-&gt;layout=false/'layout'</li>
+    <li>视图中选择布局 $this-&gt;context-&gt;layout=false/'layout'</li>
+</ul>
+<h3>6.模型的基本设置</h3>
+<p>yii的模型是MVC的处理器，它执行对MVC逻辑的处理。 model的属性定义是其核心，由于默认定义魔术方法get/set，所以可以直接在model外调用$modle-&gt;attr='value'，对模型的属性进行获取/赋值。</p>
+<h5>场景设置</h5>
+<p>yii中有对场景的定义，定义场景可以使得yii在不同的情况下返回不同的数据信息。用model的scenarios()方法来设置返回数据。</p>
+<p>我们在使用model时传入场景名 $model=new Model(['scenario'=&gt;'login']);来确定场景。</p>
+<h5>规则设置</h5>
+<p>yii中对验证规则的定义，使用rules()方法可以一条定义多条规则，也可以根据不同的场景进行定义。外部验证时用$model-&gt;validate()方法来执行验证。</p>
+<p>在安全模式下，要进行安全验证，即每一个属性都要在rules里验证，<span style="color: #ff0000;">如果没有特定规则，也要添加'safe'验证。</span>否则验证失败，存入数据库也会失败。</p>
+<h5>标签设置</h5>
+<p>在处理表单时，多用$model-&gt;attributes属性来表示全部的属性。其中attributeLabels方法return一个数组用来表示视图层中ActiveForm产生的各个表单项的label标签</p>
+<h3>7.引用JS/CSS文件</h3>
+<p>yii中的view也使用面向对象方式 ，所以引入CSS和JS文件要用特殊的方法。</p>
+<ul>
+    <li>使用$this-&gt;registerJsFile('js.js')来引入js文件；</li>
+    <li>使用$this-&gt;registerJsFile('js.js')来引入js文件；</li>
+</ul>
+<h3>8.分页类的使用</h3>
+<pre><code>//在模型中计算出总数量
+$count=$this-&gt;find()-&gt;where()-&gt;count();
+//用总条数和设定的每页个数实例化一个yii\data\Pagination类
+$page=new Pagination([totalCount' =&gt; $count,'defaultPageSize'   =&gt; 2,]);
+//使用分页类的属性搜索想要的数据，并返回数据
+$res=$this-&gt;find()-&gt;where()-&gt;offset($page-&gt;offset)-&gt;limit($page-&gt;limit)-&gt;all();
+return [$res,$page];
+//使用控制器渲染页面
+$data=$model-&gt;getData();
+return $this-&gt;render('index',$data);
+//在视图页面中使用数据。
+foreach($res as key)...
+yii\widgets\LinkPager::widget([pagination=$page,prevPageLabel='上一页'])。
+</code></pre>
+<h3>9.创建url</h3>
+<pre><code>use yii\helpers\Url;
+Url::to(['xxx/xxx']);
+//或
+Yii::$app-&gt;urlManager-&gt;createUrl('xxx.xxx')
+</code></pre>
+<h3>10查询构建器</h3>
+<p>yii里的QUERY查询语句构造器非常简单好用，它可以用在模型和控制器中，虽然可能会造成模型与表不对应，但其构成接近sql语句，使用它可以轻易写出复杂的sql语句而不必严格遵从yii的内置规则。</p>
+<p>方法为：</p>
+<pre><code>$res=(new yii\db\Query())-&gt;select()-&gt;from()-&gt;leftJoin()-&gt;where-&gt;()-&gt;all();
+</code></pre>
+<p>其中where语句较为复杂：</p>
+<pre><code>where('in','id',$array)或where('id'=&gt;$array)
+</code></pre>
+<p>具体可以查看<a title="yiichina" href="http://www.yiichina.com/doc/guide/2.0/db-query-builder">http://www.yiichina.com/doc/guide/2.0/db-query-builder</a>中对where方法的解析。</p>
+<h3>11.自定义函数</h3>
+<p>yii里面自定义函数可以在vendor/yiisoft/yii2/helpers/文件夹里，新建一个XXX.php文件，然后定义一个自定义类，再定义静态方法YYY()。</p>
+<p>使用时应用基命名空间，use yii\helpers\XXX,然后用类来引用基静态方法XXX::YYY()</p>
+<h3>12.关联模型</h3>
+<p>yii里面的关联模型，用来在取得当前表内的一条记录时，会取出对应表的记录。如A表内每取出一条信息，也取出B表中跟A表对应有信息，在ModelA里定义一个getBtable方法</p>
+<pre><code>function getBtable()
+{
+    return $this-&gt;hasOne/hasMany(Btable::className,['bid'=&gt;'aid']);
+}
+</code></pre>
+<p>查询时可以使用<code>joinWith('Btable')-&gt;find();</code>会在查找时查找其关联对象；也可以使用$this-&gt;find()等方法结果对象</p>
+<p>使用$res-&gt;btable来直接引用对象。</p>
+<p>使用$res[n]-&gt;btable-&gt;attr来引用B表的对应属性。</p>
+<h3>13.使用ActiveForm创建表单</h3>
+<p>yii2中使用小部件创建view视图的步骤： 设置一个Model设置其属性</p>
+<pre><code>public $username;
+public $password;
+</code></pre>
+<p>设置其rule或场景等</p>
+<pre><code>public function rules(){
+    return [
+            [['username', 'password','conpass'], 'required'],
+            ['conpass', 'password',
+        ];
+}
+</code></pre>
+<p>设置其label</p>
+<pre><code>public function attributeLabels(){
+        return [
+            'username' =&gt; '管理员',
+            'password' =&gt; '密码',
+        ];
+    }
+</code></pre>
+<p>然后在controller中将model的实例渲染进去：</p>
+<pre><code>$this-&gt;render('index',['model'=&gt;(new Model/ActiveRecord)])
+</code></pre>
+<p>最后在页面中使用ActiveForm</p>
+<pre><code>use yii\widgets\ActiveForm;
+&lt;?php $form = ActiveForm::begin([
+    'action' =&gt; ['log/login'],
+    'method'=&gt;'post'
+    ]); ?&gt;
+    &lt;?= $form-&gt;field($model, 'username') ?&gt;
+    &lt;?= $form-&gt;field($model, 'password') ?&gt;
+    &lt;div class="form-group"&gt;
+        &lt;?= Html::submitButton('Submit', ['class' =&gt; 'btn btn-primary']) ?&gt;
+    &lt;/div&gt;
+&lt;?php ActiveForm::end(); ?&gt;
+</code></pre>
+<h3>14.使用验证码</h3>
+<p>在controller中设置验证码的独立方法</p>
+<pre><code>public function actions() {
+        return [
+            'captcha' =&gt;  [
+                'class' =&gt; 'yii\captcha\CaptchaAction',
+                'height' =&gt; 50,
+                'width' =&gt; 80,
+                'minLength' =&gt; 4,
+                'maxLength' =&gt; 4
+            ],
+        ];
+    }
+</code></pre>
+<p>在model里设置rule和label,label同上</p>
+<pre><code>public function rules(){
+    return [['verifyCode', 'captcha','captchaAction'=&gt;'admin/log/captcha'],];
+}
+</code></pre>
+<p>(captchaAction要设置为controller中的位置，如果自定义module要设置module) 在view中使用</p>
+<pre><code>use yii\captcha\Captcha;
+&lt;?= $form-&gt;field($model, 'verifyCode')-&gt;widget(Captcha::className(),
+    ['captchaAction'=&gt;'log/captcha',
+        'imageOptions'=&gt;
+        ['alt'=&gt;'点击换图', 'style'=&gt;'cursor:pointer']
+    ]) ?&gt;
+</code></pre>
+<h3>15.视图中块的使用</h3>
+<p>块内容在$this-&gt;beginBlock(['id'=&gt;xxx])和$this-&gt;endBlock()之间定义，在layout中使用$view-&gt;block[id]来引用。可以在完成向模板中导入视图数据。</p>
+<p>也可以定义$this-&gt;var=xxx;在layout中用$this-&gt;var来引用。</p>
+<h3>16.更新和删除</h3>
+<h5>更新</h5>
+<pre><code>//查找到一条结果
+$res=$this-&gt;find()-&gt;where()-&gt;one();
+//对结果修改
+$res-&gt;attr='xxx';
+//执行更新操作
+$res-&gt;update();
+</code></pre>
+<h5>删除</h5>
+<pre><code>//删除一条数据
+$this-&gt;findOne($id)-&gt;delete();
+//删除所有符合条件的数据
+$this-&gt;deleteAll([where]);
+</code></pre>
+<hr />
+<h1>注意和窍门</h1>
+<h3>1.URL模块间跳转</h3>
+<p>在模块中用Url::to()方法创建URL时，会自动在前面添加模块名，导致无法跳转到其他模块，我们可以在字符串前添加'//'符来返回根模块，例如Url::to(['//index/index'])表示跳转到初始地址。</p>
+<h3>2.初始化变量</h3>
+<p>想在控制器中每一个操作前，初始化一个变量的话不要重写__construct构造函数，因为它需要传入各种变量。最好重写beforeAction()函数，它会在执行每一个action时都执行一下。</p>
+<p>并且注意：方法的最后一定要添加return true语句。</p>
+<h3>3.在JS中使用YII的变量</h3>
+<p>若想在JS中使用YII的URL变量等，可以使用html中的script标签，将变量在第一次渲染视图时预先解析出来，将下面代码放在需要使用变量的地方之前。</p>
+<pre><code>&lt;script type="text/javascript"&gt;
+    var key="&lt;?=Url::to(['xxx/xxx']) ?&gt;"
+&lt;/script&gt;
+</code></pre>
+<p>然后在JS文件中正常使用。</p>
+<h3>4.全局常量的定义</h3>
+<p>我们可以在config文件夹中的params.php中定义全局常量。</p>
+<p>然后在脚本中用Yii::$app-&gt;params['key']来引用。</p>
+<h3>5.yii模型属性转数组</h3>
+<p>YII用toArray()方法可以将模型的属性转换为数组进行输出，可独立使用，也可以在查询时用连续操作方式使用。</p>
+<h3>6.在使用controller渲染view页面时，一定要在<span style="color: #ff0000;">render前加echo或return</span> 写作echo/return $this-&gt;render('view',$data);</h3>
+<h3>7.yii中的属性，谨记！在ActiveForm中如果数据表中有了此字段，就不要再用public声明一个属性了，会导致attribute无法赋值。。。。（血泪）。</h3>

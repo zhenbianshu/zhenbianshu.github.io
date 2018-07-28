@@ -1,0 +1,63 @@
+---
+layout: post
+title: "PHP模拟发送POST请求之三、用Telnet和fsockopen()模拟发送POST信息"
+date: 2015-11-03 18:00:07 +0800
+comments: true
+---
+
+<p>了解完了HTTP头信息和URL信息的具体内容，我们开始尝试自己动手写一段头信息发送到服务器。Windows内置命令Telnet可以帮助我们发送简单的HTTP请求。</p>
+<p>并且TELNET是一个特别灵活的工具，我们还可以用它进行FTP/SMTP/POP3/TCP等方式的简单请求。</p>
+<p>通过开始菜单--运行--CMD命令进入DOS状态，</p>
+<p>我们输入&ldquo;Telnet&nbsp;主机地址&nbsp;端口（Telnet&nbsp;192.168.1.99&nbsp;80）&rdquo;&nbsp;来进入telnet命令状态（完全黑窗口，此时输出字符会出问题），我们按&rdquo;ctrl&rdquo;+&rdquo;]&rdquo;，切回普通CMD窗口，再按&rdquo;ENTER&rdquo;回车键进入编辑命令状态。</p>
+<p>如果系统提示找不到TELNET命令，只需按如下方式可解锁TELNET命令。</p>
+<p><img src="/images/819496-20151103101936758-2090262302.png" alt="" /></p>
+<p>进入TELNET&nbsp;命令输入模式后我们就可以直接编辑头文件来进行发送了</p>
+<p>只需要注意：当编辑完请求头文件后要按两次回车键来发送。</p>
+<p><img src="/images/819496-20151103102056680-877407850.png" alt="" /></p>
+<p>这是一次标准的HTTP请求与响应，是不是跟上节的HTTP文件关联了。</p>
+<p>当然我们不能只用这么不方便的工具，下面要介绍的是PHP里的<strong><span style="font-size: 15px;">fsockopen()</span></strong>方法。</p>
+<p>先来看fsockopen()方法的原型：</p>
+<blockquote>
+    <p>resource&nbsp;fsockopen&nbsp;(&nbsp;string&nbsp;$hostname&nbsp;[,&nbsp;int&nbsp;$port&nbsp;=&nbsp;-1&nbsp;[,&nbsp;int&nbsp;&amp;$errno&nbsp;[,&nbsp;string&nbsp;&amp;$errstr&nbsp;[,&nbsp;float&nbsp;$timeout&nbsp;=&nbsp;ini_get("default_socket_timeout")&nbsp;]]]]&nbsp;)</p>
+</blockquote>
+<p>它返回一个资源类型的结果，需要传入的参数分别是：</p>
+<p>$hostname：主机名</p>
+<p>$port：端口号</p>
+<p>$errno：错误号(注意原型中的"&amp;"一旦连接有错误，错误号将会被赋值给$errno)</p>
+<p>$errstr：错误字符串(一旦连接有错误，错误信息将会被赋值给$errstr)</p>
+<p>$timeout：超时时间</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$host</span>=<span style="color: #008080;">parse_url</span>(<span style="color: #800080;">$url</span>,PHP_URL_HOST);<span style="color: #008000;">//</span><span style="color: #008000;">获取host数据</span>
+
+<span style="color: #800080;">$port</span>=<span style="color: #008080;">parse_url</span>(<span style="color: #800080;">$url</span>,PHP_URL_PORT)==<span style="color: #0000ff;">null</span> ? 80 : <span style="color: #008080;">parse_url</span>(<span style="color: #800080;">$url</span>,PHP_URL_PORT);<span style="color: #008000;">//</span><span style="color: #008000;">获取端口数据，如果没有设置则默认为80</span>
+
+<span style="color: #800080;">$path</span>=<span style="color: #008080;">parse_url</span>(<span style="color: #800080;">$url</span>,PHP_URL_PATH);<span style="color: #008000;">//</span><span style="color: #008000;">获取到path信息后面使用</span>
+
+<span style="color: #800080;">$socket</span>=<span style="color: #008080;">fsockopen</span>(<span style="color: #800080;">$host</span>,<span style="color: #800080;">$port</span>,<span style="color: #800080;">$errno</span>,<span style="color: #800080;">$errstr</span>,20);//获取资源类型$socket</pre>
+</div>
+<p>这个资源类型就如同Telnet里我们用telnet&nbsp;主机名&nbsp;端口号&nbsp;命令之后的环境。</p>
+<p>那么接下来，我们就要往这个环境里写内容了。</p>
+<p>我们可以分次用fwrite()方法写入头信息，也可以将头信息进行拼合一次写入。</p>
+<div class="cnblogs_code">
+<pre><span style="color: #008080;">fwrite</span>(<span style="color: #800080;">$socket</span>, "POST ".<span style="color: #800080;">$path</span>." HTTP/1.1\r\n"<span style="color: #000000;">);
+
+</span><span style="color: #008080;">fwrite</span>(<span style="color: #800080;">$socket</span>, "HOST: localhost\r\n\r\n");</pre>
+</div>
+<p>或先拼合再写入的方式：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$str</span>="POST ".<span style="color: #800080;">$path</span>." HTTP/1.1\r\n"."HOST: localhost\r\n\r\n"<span style="color: #000000;">;
+
+</span><span style="color: #008080;">fwrite</span>(<span style="color: #800080;">$socket</span>,<span style="color: #800080;">$str</span>);</pre>
+</div>
+<p>注意：请求行、报头之间有一次回车键，我们用"<strong><span style="font-size: 15px;">\r\n"</span></strong>来进行回车输入，结束输入时两用"\r\n\r\n"模拟两次回车。</p>
+<p>接下来我们用fread来读取响应信息并将其存入$info中：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #0000ff;">while</span> (!<span style="color: #008080;">feof</span>(<span style="color: #800080;">$socket</span>)) {          <span style="color: #008000;">//</span><span style="color: #008000;">当还有待读取内容</span>
+
+    <span style="color: #800080;">$info</span>.= <span style="color: #008080;">fgets</span>(<span style="color: #800080;">$socket</span>, 4096);  <span style="color: #008000;">//</span><span style="color: #008000;">每次读取4096个字节内容，并用.连接符连接到$info中。</span>
+<span style="color: #000000;">}
+</span><span style="color: #0000ff;">echo</span> <span style="color: #800080;">$info</span>;<span style="color: #008000;">//</span><span style="color: #008000;">输出返回结果。</span></pre>
+</div>
+<p>当然以上是一个特别简单的例子，我们可以通过拼合更多的报头信息（加入Accept等）来将它更加完善。</p>
+<p>接下来我们会说一些常用的POST方式。</p>
+<p>如果您觉得本文对您有帮助，请您动手点一下推荐，如果有什么问题，可以在下方留言共同讨论，谢谢。</p>

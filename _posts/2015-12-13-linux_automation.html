@@ -1,0 +1,97 @@
+---
+layout: post
+title: "linux的“自动化”"
+date: 2015-12-13 18:00:08 +0800
+comments: true
+---
+
+<h1>linux的&ldquo;自动化&rdquo;</h1>
+<p>linux系统的web网站在运营状态时，我们常需要对网站进行维护，例如查看资源剩余并做出响应、日志分割、数据整理，在特定状态执行特定任务等等，这些都会需要linux能实现自动执行某些任任务。本篇博文介绍如何进行常见的linux自动化任务。</p>
+<p>实现&ldquo;自动化&rdquo;有如下好处：</p>
+<ol>
+    <li>节省人力，一个脚本就够了。</li>
+    <li>在夜晚自动执行可以避开网站流量高峰期，不影响网站白天的效率。</li>
+    <li>准确，设置完善的情况下，不会出差错。</li>
+    <li>当然最重要的还是省心了，不用频繁的敲某些命令了。</li>
+</ol><hr />
+<h1>&nbsp;开机启动</h1>
+<p>开机启动应该是我们很经常的需求了，我们常需要在开机时就自动执行某些命令来开启服务，进程等，有了它我们不必再在每次开机时输入同一堆命令。</p>
+<h3>chkconfig命令</h3>
+<p>使用chkconfig命令可以在设置在不同启动级别下启动特定的服务或是程序。</p>
+<p>先说一下linux的运行级别：</p>
+<ul>
+    <li>等级0表示：表示关机</li>
+    <li>等级1表示：单用户模式</li>
+    <li>等级2表示：无网络连接的多用户命令行模式</li>
+    <li>等级3表示：有网络连接的多用户命令行模式</li>
+    <li>等级4表示：不可用</li>
+    <li>等级5表示：带图形界面的多用户模式</li>
+    <li>等级6表示：重新启动</li>
+</ul>
+<p>chkconfig的命令如下：</p>
+<pre><code>chkconfig --list //命令查看已设置的开启自启动列表。
+xxxd 0:off 1:off 2:on ... 6:off //list的结果，表示在xxxd服务在启动级别为2 3 4 5 的情况下会自动启动。
+chkconfig --add xxxd//向任务列表中添加一个xxxd服务
+chkconfig [--level 1/2/../6] xxxd on/off//设置xxxd用服务在n状态为开/关，[]内省略则在2345级别开启
+chkconfig --del xxxd //将任务列表中的xxxd服务删除
+</code></pre>
+<h3>rc.d文件的编辑</h3>
+<p>也可以直接编辑/etc/rc.d/目录下的文件来实现开机自启动。此目录下有很多文件，rcn.d是在启动状态为n的情况下的启动文件夹，rc、rc.sysinit、init.d都是系统的模块或系统设置的自启文件[夹]。</p>
+<p>我们用<span style="color: #ff0000;"><strong>vim rc.local</strong> </span>编辑 rc.local文件，来定制自己的自启计划。命令十分简单，就像平常在操作一样。如/usr/local/apache/bin/apachectl start表示开机自启动apache服务器。</p>
+<hr />
+<h1>&nbsp;at实现定时任务</h1>
+<p>at是一个简单的功能简单的定时任务程序，它只能进行一次性的定时任务，其用法如下：</p>
+<pre><code>#at time　　　　　　//at加时间启动at命令
+at&gt;operation　　　　//输入要执行的操作
+at&gt;Ctrl+D　　　　　　//按Ctrl+D退出命令编辑
+</code></pre>
+<p>其time的常见形式如下</p>
+<pre><code>at H:m tomorrow     //第二天的H点m分
+at now + n minutes/hours/days/weeks  //在n分/时/天/周后
+at midnight         //在午夜=-=
+at H:m pm/am        //在当天上午/下午的H点m分
+</code></pre>
+<p>我们也可以在<strong><span style="color: #ff0000;">/var/spool/at</span></strong>文件中查看at的当前命令。还需要注意的是，linux默认atd进程关闭状态，需要手动打开。</p>
+<hr />
+<h1>crontab实现定时任务</h1>
+<p>linux内置的cron进程能帮我们实现这些需求，cron搭配shell脚本，非常复杂的指令也没有问题。</p>
+<h3>cron介绍</h3>
+<p>cron守护进程是一个由实用程序和配置文件组成的小型子系统，在几乎所有类 UNIX 系统上都可以找到某种风格的cron，我们可以用<strong>ps aux|grep cron</strong>找到crond这个守护进程。</p>
+<p>我们经常使用的是crontab命令是cron table的简写，它是cron的配置文件，也可以叫它作业列表，我们可以在以下文件夹内找到相关配置文件。</p>
+<ul>
+    <li>/var/spool/cron/ 目录下存放的是每个用户包括root的crontab任务，每个任务以创建者的名字命名</li>
+    <li>/etc/crontab 这个文件负责调度各种管理和维护任务。</li>
+    <li>/etc/cron.d/ 这个目录用来存放任何要执行的crontab文件或脚本。</li>
+    <li>我们还可以把脚本放在/etc/con.hourly、/etc/con.daily、/etc/con.weekly、/etc/con.monthly目录中，让它每小时/天/星期、月执行一次。</li>
+</ul>
+<h3>crontab的使用</h3>
+<p>我们常用的命令如下：</p>
+<pre><code>crontab [-u username]　　　　//省略用户表表示操作当前用户的crontab
+    -e      (编辑工作表)
+    -l      (列出工作表里的命令)
+    -r      (删除工作作)
+</code></pre>
+<p>我们用<strong><span style="color: #ff0000;">crontab -e</span></strong>进入当前用户的工作表编辑，是常见的vim界面。每行是一条命令。</p>
+<p>crontab的命令构成为 <strong>时间+动作</strong>，其时间有<span style="color: #ff0000;"><strong>分、时、日、月、周</strong></span>五种，操作符有</p>
+<ul>
+    <li><span style="color: #ff0000;"><strong>*</strong> </span>取值范围内的所有数字</li>
+    <li><span style="color: #ff0000;"><strong>/</strong></span> 每过多少个数字</li>
+    <li><span style="color: #ff0000;"><strong>-</strong></span> 从X到Z</li>
+    <li><span style="color: #ff0000;"><strong>，</strong></span>散列数字</li>
+</ul>
+<p>以下是几个例子。</p>
+<pre><code>时间                  注释
+0 0 25 12 *     //在12月25日的0时0分
+*/5 * * * *     //每过5分钟
+* 4-6 * * *     //每天的4 5 6点
+* * * * 2，5     //每周二和周五
+</code></pre>
+<h3>配合简单的shell脚本</h3>
+<p>如果我们的命令有逻辑判断等非常复杂的操作时，再直接编辑crontab就有点困难了，这时，我们可以使用shell脚本。其来历，分类定义与题不符，不再多说，我们直接说它的用法。</p>
+<p>我们用vim /usr/sh/test.sh来使用vim编辑一个shell脚本</p>
+<pre><code>#!/bin/sh           //声明开始shell脚本
+a = "hello world"   //定义一个shell变量
+echo $a             //熟悉的echo，输出a变量
+</code></pre>
+<p>然后crontab -e编辑crontab，添加 <code>*/5 * * * * /usr/sh/test.sh</code>每隔五分钟运行一次test.sh脚本，也可以用&nbsp;<span class="cnblogs_code">/phppath/php /filepath/test.php</span>&nbsp;来用php进程来执行php程序。</p>
+<p>如果您觉得本博文对您有帮助，您可以推荐或关注我，如果您有什么问题，可以在下方留言讨论，谢谢。</p>

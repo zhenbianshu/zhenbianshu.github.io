@@ -1,0 +1,98 @@
+---
+layout: post
+title: "从并发处理谈PHP进程间通信（二）System V IPC"
+date: 2017-02-20 18:00:08 +0800
+comments: true
+---
+
+<h1 id="toc_0">前言</h1>
+<p>进程间通信是一个永远的话题，我的上一篇文章通过一个并发循环ID生成器的实现介绍了如何使用外部介质来进行进程间通信：<a href="http://www.cnblogs.com/zhenbianshu/p/6388777.html">从并发处理谈PHP进程间通信（一）外部介质</a> 。介绍的几种方法适用于各种语言，但是他们都依赖于一种外部介质，文化的读写有瓶颈，mysql 和 redis 会挂掉或连接超时，归根结底总觉得在 HACK；</p>
+<p>对于进程间通信，每一个完备的语言都应该有对应的处理方式，而 PHP 对应的则是一族对 UNIX SYSTEM V包装的函数，包括信号量（semaphore）、共享内存（shared memory）和消息队列（msg queue）的操作。</p>
+<p>它的安装和使用非常简单，在编译 PHP 时添加 <code>--enable-sysvsem --enable-sysvshm --enable-sysvmsg</code> 参数就可以，当然 Windows 上无法使用。</p>
+<p>今天我们仍旧使用上一篇文章的例子来介绍 PHP 内部实现的进程间通信，在了解它们的具体使用之前，先简单介绍一下信号量、共享内存、消息队列的概念。</p>
+<hr />
+<h1 id="toc_1">Unix System V IPC</h1>
+<h3 id="toc_2">信号量</h3>
+<p>信号量又称为信号灯，它是用来协调不同进程间的数据对象的，而最主要的应用是共享内存方式的进程间通信。本质上，信号量是一个计数器，它用来记录对某个资源（如共享内存）的存取状况。</p>
+<p>一般说来，为了获得共享资源，进程需要执行下列操作：</p>
+<ol>
+    <li>获取控制共享资源的信号量的值；</li>
+    <li>若值为正，进程将信号量减1，进程操作共享资源，进入步骤4；</li>
+    <li>若值0，则拒绝进程使用共享资源，进程进入睡眠状态，直至信号量值大于0后，进程被唤醒，转入步骤1；</li>
+    <li>当进程不再使用共享资源时，将信号量值加1。如果此时有进程正在睡眠等待此信号量，则唤醒此进程；</li>
+</ol>
+<p>信号量的使用可以类比为：</p>
+<p>一个房间必须用钥匙才能开门，有N把钥匙放在门口，拿到钥匙开门进入房间，出来时将钥匙放回并告知等待的人去取钥匙开门。 此例中，钥匙的数量限制了同一时间内在房间的最大人数。房间即共享资源，钥匙是信号量，而想进入房间的人则是多个进程。</p>
+<p>信号量有二值和多值之分，一般共享资源都不允许多个进程同时操作，多使用二值信号量。</p>
+<h3 id="toc_3">共享内存</h3>
+<p>为了在多个进程间交换信息，内核专门留出了一块内存区，可以由需要访问的进程将其映射到自己的私有地址空间。进程就可以直接读写这一块内存而不需要进行数据的拷贝，从而大大提高效率。共享内存可以比喻成一块公用黑板，每个人都能在上面留言，写东西。</p>
+<p>到于共享内存，我们一定要关心其生存周期：System V 共享内存区域对象是随内核持续的，除非显式删除共享内存区域对象，即使所有访问共享内存区域对象的进程都已经正常结束，共享内存区域对象仍然在内核中存在，在内核重新引导之前，对该共享内存区域对象的任何改写操作都将一直保留。</p>
+<h3 id="toc_4">消息队列</h3>
+<p>消息队列是一条公共消息链，消息存取一般为先进先出（FIFO），能实现多个进程对消息的原子操作和异步存取。消息队列的应用十分广泛，不光是进程间通信，流程异步化、解耦方面也应用广泛。</p>
+<p>消息队列则相当于一条流水线的一段，上层有多个工人把产品放入，下层有多个工人将产品取出加工。</p>
+<p>本文的实现不包括消息队列的使用，但对于消息队列实现互斥锁，这里给出一个思路：先给消息队列初始化一个值，并发进程竞争获取此值，获取到值的进程进行共享资源的处理，进程不再共享资源时，再将此值放入队列，通过队列的原子性来保证同时只有一个进程访问共享资源。</p>
+<hr />
+<h1 id="toc_5">函数介绍</h1>
+<h3 id="toc_6">ftok</h3>
+<p><code>int ftok ( string $pathname, string $proj )</code></p>
+<p>ftok将一个路径 pathname 和一个项目名（必须为一个字符）， 转化成一个整数形的 System V IPC 键，本文介绍的 System V 通信方式都是基于此键来完成的，此ID 值也可以自己指定一个 INT 型来确定，不必要使用 ftok 获取；</p>
+<p>需要注意的是：ftok 的结果是通过文档的索引节点号来计算获取的，而文件的删除重建会导致其索引节点号变动，所以即使是相同的文件名，也可能会导致获取到的 IPC 键不同，所以需要尽量保证 $pathname 不变动；</p>
+<h3 id="toc_7">semaphore函数</h3>
+<ul>
+    <li>
+        <p><code>resource sem_get ( int $key [, int $max_acquire = 1 [, int $perm = 0666 [, int $auto_release = 1 ]]] )</code></p>
+        <p>获取或生成一个信号量标识，我们注意其 max_acquire 值为 1，即保证同时只有一个进程能获取到它；auto_release 为 1 ，保证进程在非正常情况退出时能释放此信号量；</p>
+    </li>
+    <li>
+        <p><code>bool sem_acquire ( resource $sem_identifier [, bool $nowait = false ] )</code></p>
+        <p><code>bool sem_release ( resource $sem_identifier )</code></p>
+        <p>获取/释放一个信号量，注意获取信号量的 $nowait 为false，使进程在获取信号量失败后进行进程等待即可。</p>
+    </li>
+</ul>
+<h3 id="toc_8">shared_memory函数</h3>
+<ul>
+    <li>
+        <p><code>resource shm_attach ( int $key [, int $memsize [, int $perm = 0666 ]] )</code></p>
+    </li>
+    <li>
+        <p><code>bool shm_detach ( resource $shm_identifier )</code></p>
+        <p>连接/断开 与 共享内存段的连接 $memsize， 以字节 byte 为单位；需要注意，在第一次使用 $key 连接内存段创建时，会初始化内存大小和权限，后续再连接时，这两个参数会被忽略。</p>
+    </li>
+    <li>
+        <p><code>bool shm_put_var ( resource $shm_identifier , int $variable_key , mixed $variable )</code></p>
+    </li>
+    <li>
+        <p><code>mixed shm_get_var ( resource $shm_identifier , int $variable_key )</code></p>
+        <p>向共享内存内写入或读取一个变量，需要注意变量 key 只能是 int 型；</p>
+    </li>
+</ul>
+<hr />
+<h1 id="toc_9">代码实现</h1>
+<div>
+<pre><code class="language-none">function getCycleIdFromSystemV($max, $min = 0) {
+        $key = ftok('/tmp/cycleIdFromSystemV.tok', 'd');
+        $var_key = 0;
+        $sem_id = sem_get($key);
+        $shm_id = shm_attach($key, 4096);
+
+        if (sem_acquire($sem_id)) {
+            $cycle_id = intval(shm_get_var($shm_id, $var_key));
+            $cycle_id++;
+            if ($cycle_id &gt; $max) {
+                $cycle_id = $min;
+            }
+            shm_put_var($shm_id, $var_key, $cycle_id);
+
+            shm_detach($shm_id);
+            sem_release($sem_id);
+
+            return $cycle_id;
+        }
+
+        return false;
+    }</code></pre>
+</div>
+<h1 id="toc_10">小结</h1>
+<p>我们发现 PHP 对信号量和共享内存封装得很好，使用起来非常简单。除此之外，PHP 的类库 Sync 将常用 IPC 方法封装成为类，能实现跨平台的使用，感兴趣的可以了解使用一下。</p>
+<p>当然进程间通信的方式和种类有很多，本文介绍的 id 递增只是很简单的一种，不过，知道了方法，再去把这些方法改造成为其他种类也就不难了。</p>
+<p>如果您觉得本文对您有帮助，可以点击下面的 <strong><em>推荐</em></strong> 支持一下我。博客一直在更新，欢迎 <strong><em>关注</em></strong> 。</p>

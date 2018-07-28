@@ -1,0 +1,87 @@
+---
+layout: post
+title: "用C写一个web服务器（一） 基础功能"
+date: 2017-03-14 18:00:08 +0800
+comments: true
+---
+
+<h1 id="toc_0">前言</h1>
+<p>C 语言是一门很基础的语言，程序员们对它推崇备至，虽然它是我的入门语言，但大学的 C 语言知道早已经还给了老师，C 的使用可以说是从头学起。</p>
+<p>之前一直在读书，看了《C Primer Plus》、《APUE》、《UNP》，第一本看完之后虽然对 C 的语法有了大概的了解，可是要说应用，还差得很远；后两本算是咬着牙翻完的，应用更不敢说，只是对概念有了基本的认识。</p>
+<p>我们都知道，学一门语言，只看不写，很容易出现眼高手低，写代码无处下手的情况，于是终于在下班和周末挤出时间，准备写一个小项目。正好最近在看 nginx 服务器与 php sapi 相关的知识，于是考虑以 nginx 的思想，写一个类似的简化版 web 服务器。</p>
+<p>项目最终的成果不敢保证，像上次写的 PHP 框架，在原理通透，技术要点掌握之后只剩下功能完善和代码堆叠，也就没有继续下去的欲望了，于是太监了。。。 但是跟着学习和理解一遍一定会有很大收获，这点是能保证的。 另外一直写同一系列的东西会让我有一种负担感，而且偏底层的东西也需要很多时间去学习，这一系列可能会间隔更新，欢迎关注。</p>
+<p>最后附上项目 GitHub 地址：<a href="https://github.com/zhenbianshu/tinyServer" target="_blank">请点我</a></p>
+<hr />
+<h1 id="toc_1">服务器架构</h1>
+<h3 id="toc_2">目标架构</h3>
+<p>以 nginx 的思想来考虑本服务器架构，初步考虑如下图：</p>
+<p><img src="/images/819496-20170314203009635-315885048.png" alt="" /></p>
+<p>当然 php 进程也可以替换为其他的脚本语言，可以更改源码中的 command 变量实现。</p>
+<p>服务器有一个 master 进程，其有多个子进程为 worker 进程，master 进程受理客户端的请求，然后分发给 worker 进程，worker 进程处理 http 头信息后将参数传递给 php 进程处理后，将结果返回到上层，再响应给客户端。</p>
+<p>也考虑过使用 php-fpm 的 worker 进程池方式，那样的话 php-fpm 进程也要仿写了，目前还不熟悉其内部构造，如果可以简单化，自然向其靠拢。目前对 PHP 的 SAPI 接口不熟，了解一下再考虑。</p>
+<h3 id="toc_3">当前状态</h3>
+<p>当前状态的服务器还极其简单，总结下来有以下地方待优化：</p>
+<ul>
+    <li>当前还是单进程，需要改成多进程，最终为 worker 进程池方式；</li>
+    <li>优化 socket IO 模型，考虑 epoll、事件驱动方式；</li>
+    <li>只支持 HTTP GET 请求方法，未进行太多的异常处理来定义 http 状态码；</li>
+    <li>与 php 进程的交互方式，考虑如 nginx 使用 unix domain socket 方式。</li>
+    <li>协议目前只考虑了 http，后续会考虑一些基于 TCP 的协议；</li>
+</ul>
+<p>虽然简单，但服务器已经有基本的功能了：</p>
+<p>它监听本地地址的 8080 端口，将接收到的 http 头中的 path 信息提出出来交给 php 进程，php 进程将参数信息处理后返回给服务器，服务器拼装 http 响应信息再将结果返回给客户端。</p>
+<p>下面介绍各个功能的实现：</p>
+<hr />
+<h1 id="toc_4">功能实现</h1>
+<h3 id="toc_5">socket系列方法</h3>
+<p>在介绍函数之间先用一张图来介绍一次 http 请求中客户端与服务器之间的交互：</p>
+<p><img src="/images/819496-20170314203039338-1412939276.png" alt="" /></p>
+<p>如图：服务器创建要进行：</p>
+<ol>
+    <li>调用 socket() 创建一个连接；<code>int socket(int domain, int type, int protocol);</code></li>
+    <li>调用 bind() 给套接字命名，绑定端口；<code>int bind( int socket, const struct sockaddr *address, size_t address_len);</code></li>
+    <li>调用 listen() 监听此套接字；<code>int listen(int socket, int backlog);</code></li>
+    <li>调用 accept() 接受客户端的连接；<code>int accept(int socket, struct sockaddr *address, size_t *address_len);</code></li>
+    <li>调用 recv() 接收客户端的信息；<code>int recv(int s, void *buf, int len, unsigned int flags);</code></li>
+    <li>调用 send() 将响应信息发送给客户端；<code>int send(int s, const void * msg, int len, unsigned int falgs);</code></li>
+</ol>
+<p>socket 间的接收和发送信息在 C 中有几个系列：<code>write() / read() 、send() / recv() 、sendto() / recvfrom()、 sendmsg() / recvmsg()</code>,可以自行选用。</p>
+<p>另外函数参数释义和要点，都被我注释在代码中了，感兴趣的可以拉下来看一下，这些在网上也多有介绍，这里不再赘述。</p>
+<h3 id="toc_6">服务器与 PHP cli 交互</h3>
+<p>然后是 C 进程和 php 进程的交互，考虑到简单易用，目前在 C 进程中直接执行 php 脚本：</p>
+<p>一开始使用 system() 函数: <code>int system(const char *command);</code></p>
+<p>system 函数会 fork 一个子进程，在子进程中以 cli 方式执行 php 脚本，并将错误码或返回值返回。由于其结果类型不可控，编译时会报一个 warning。而且它将结果返回给父进程时，还会在标准输出中打印结果，在服务器执行时会抛出异常。</p>
+<p>于是找到了另一个方法 popen， <code>FILE * popen(const char * command, const char * type);</code>：</p>
+<p>popen 同样会 fork 一个子进程来执行 command ，然后建立管道连到子进程的标准输出设备或标准输入设备，然后返回一个文件指针。随后进程便可利用此文件指针来读取子进程的输出设备或是写入到子进程的标准输入设备中。</p>
+<p>其 type 参数便是控制连接到子进程的标准输入还是标准输出。我们想要子进程的标准输出，于是传入 type参数为 字符 &ldquo;r&rdquo; (read)。同理，如果想写入子进程标准输入的话，可以传值 &ldquo;w&rdquo;（write）。</p>
+<p>另外在接收缓冲区内容的时候也出现了一点小意外：由于使用的 fgets() 方法会以换行符<code>\n</code>为一段的结尾，在接收 php 进程输出时遇到换行会结束，这里使用了一个中间字符串数组<code>line</code>来接收每一行的信息，将每一行的信息拼装到结果中。</p>
+<p>代码如下：</p>
+<div>
+<pre><code class="language-none">char * execPHP(char *args){
+        // 这里不能用变长数组，需要给command留下足够长的空间，以存储args参数，不然拼接参数时会栈溢出
+        char command[BUFF_SIZE] = "php /Users/mfhj-dz-001-441/CLionProjects/cproject/tinyServer/index.php ";
+        FILE *fp;
+        static char buff[BUFF_SIZE]; // 声明静态变量以返回变量指针地址
+        char line[BUFF_SIZE];
+        strcat(command, args);
+        memset(buff, 0, BUFF_SIZE); // 静态变量会一直保留，这里初始化一下
+        if((fp = popen(command, "r")) == NULL){
+            strcpy(buff, "服务器内部错误");
+        }else{
+            // fgets会在获取到换行时停止，这里将每一行拼接起来
+            while (fgets(line, BUFF_SIZE, fp) != NULL){
+            strcat(buff, line);
+            };
+        }
+
+        return buff;
+    }</code></pre>
+</div>
+<h3 id="toc_7">报文数据处理</h3>
+<p>socket 处于应用层和传输层之间的虚拟层，由于设置服务器 socket 协议类型为 TCP，那么 TCP 的握手挥手、数据读取等步骤对于我们都是透明的。我们拿到的数据即 HTTP 报文，关于 HTTP 报文结构和其字段解释的文章非常多，这里也不再多提。</p>
+<p>首先使用 C 的 strtok() 方法，获取到 HTTP 头的第一行，获取到其 http 方法和 path 信息，将这些信息处理后，再使用 sprintf() 方法拼合 HTTP 响应报文，主要替换了 响应内容长度和响应内容。</p>
+<hr />
+<h1 id="toc_8">小结</h1>
+<p>对 C 的用法还不太熟悉，没用指针、结构等华丽操作，光简单的实现就花了我好久。可能代码路子也会有点野，希望有路过的大神能随手提点一二；</p>
+<p>服务器相关的知识很深，每一个优化点需要扎实的基础知识来巩固，可能我学到的也只是皮毛，文章难免有错漏处，如果发现，烦请指出。</p>
+<p>如果您觉得本文对您有帮助，可以点击下面的 <strong><em>推荐</em></strong> 支持一下我。博客一直在更新，欢迎 <strong><em>关注</em></strong> 。</p>

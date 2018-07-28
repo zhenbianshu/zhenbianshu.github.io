@@ -1,0 +1,165 @@
+---
+layout: post
+title: "代码迁移之旅（二）- 渐进式迁移方案"
+date: 2017-12-25 18:00:06 +0800
+comments: true
+---
+
+<h1>说在前面</h1>
+<p>这是代码迁移的第二篇文章，也是最后一篇了，由于个人原因，原来的迁移我无法继续参与了，但完整的方案我已经准备好了，在测试环境也已经可以正常进行了。 上篇文章 <a href="http://www.cnblogs.com/zhenbianshu/p/7773930.html">代码重构之旅（一） 项目结构</a> 介绍了迁移代码的前期准备和项目结构的设计，本篇文章来介绍一下可实施的迁移方案。</p>
+<p>使代码的迁移过程更简单、更安全是我们要追求的目标，在迁移之前，代码的可用性我们一定也只能画一个问号。</p>
+<p>文章欢迎转载，但请注明来源：http://www.cnblogs.com/zhenbianshu/p/8110912.html， 谢谢。</p>
+<hr />
+<h1 id="toc_1">问题抽象分析</h1>
+<p>首先要看一下一次完整的迁移需要满足什么要求：</p>
+<ul>
+    <li>灰度发布，谁也无法保证一次将整个系统迁移到另一个系统不会发生问题，而以接口或接口部分流量为单位进行迁移则可以大大提升可控性。</li>
+    <li>客户端无感知，即迁移平滑，长时间的系统不可用是完全无法接受的。</li>
+    <li>可回滚，一旦出现异常问题可以快速回滚，避免造成较大影响。</li>
+    <li>易实现，尽量避免大量地操作，操作多意味着犯错的可能性更大，回滚的难度也大。</li>
+</ul>
+<p>只有实现了以上要求，才算是一次成功的迁移。那么先分析一下目前的情况：</p>
+<p><img src="/images/819496-20171225195252853-362048442.png" alt="" /></p>
+<p>如上图是我们两个系统的目前状态：</p>
+<ul>
+    <li>两个系统共享一个 Nginx 服务器，而且在 Nginx 中，由于新老系统的 <code>Host::Ip</code> 也不需要变动，所以新老系统还共享一个同一个 Server。</li>
+    <li>新旧两个模块分别对应着两个版本控制目录，旧模块将 Http 请求进行 url 重写后直接分发到各 PHP 脚本，例如：<code>rewrite ^/api/common/test.json?(.*)$ /api_test.php?$1;</code></li>
+    <li>新模块将 Http 请求直接分发到 index.php 后，由 index.php 进行内部路由转发。</li>
+</ul>
+<p>两个模块初始状态相安无事，现在的问题是如何将旧模块的接口逐渐过渡到新模块中。由于旧模块的分发入口在 Nginx 中，最简单的办法自然是修改其原来的重定向规则。</p>
+<hr />
+<h1 id="toc_2">Nginx重定向</h1>
+<p>先看一个典型的 Nginx Http 服务器配置：</p>
+<div>
+<pre class="line-numbers"><code class="language-nginx">http {
+    upstream stream_name{
+    }
+
+    server {
+        listen port;
+        server_name domain_name host_name;
+
+        rewrite ori destA;
+
+        location pathA {
+            rewrite ori destB type;
+        }
+
+        location pathB {
+            if(match){
+                rewrite ori destC type;
+            }
+                rewrite ori destD type;
+        }
+    }
+}</code></pre>
+</div>
+<p>我们要使用的就是 Nginx 强大的路由重定向功能。</p>
+<h3 id="toc_3">location</h3>
+<p>location 是一个 URI 捕获语句，它被定义在 server 模块内，会对 server 内的所有请求进行 uri 匹配，一旦匹配，则进入 location 模块内部执行。</p>
+<p>location 常见的使用形式是：</p>
+<div>
+<pre class="line-numbers"><code class="language-nginx">location path_pattern {
+    operation;
+}</code></pre>
+</div>
+<p>它的 <code>path_pattern</code> 有以下几种形式，优先级从高到低为：</p>
+<ol>
+    <li>完全相等匹配 <code>location = uri {}</code></li>
+    <li>前缀匹配 <code>location prefix {}</code> 或 <code>location ^prefix ~ {}</code></li>
+    <li>正则匹配 <code>location ~ regex {}</code> 或不区分大小写正则匹配 <code>location *~ regex {}</code></li>
+    <li>通用匹配 <code>location / {}</code></li>
+</ol>
+<p>不同的 pattern 类型匹配顺序与定义顺序无关，而是由优先级从高到低进行匹配，同一类型的，优先使用 pattern 串更长的进行匹配，因为长串会更精确。</p>
+<p>它的 operation 一般是 rewrite 或 proxy_pass 语句，对捕获到的请求进行重写或转发。用于转发的 proxy_pass 语句很简单， <code>proxy_pass proxy_name;</code> 即可，下面具体说一下路由重写功能。</p>
+<h3 id="toc_4">if</h3>
+<p>if 语句可以对 uri 进行更加灵活的判断和操作，它的常见使用形式是：</p>
+<div>
+<pre class="line-numbers"><code class="language-nginx">if (match) {
+    rewrite ori destA type;
+}
+    rewrite ori destB type;</code></pre>
+</div>
+<p>在 <code>match</code> 语句中，可以使用如 <code>$request_uri</code> 等全局变量，常见的还有 <code>$query_string,$uri,$remote_addr</code>等。</p>
+<p>但是需要注意使用 if 语句是十分低效的行为，它就像普通的代码一样，每个 Http 请求碰到 if 语句都会进行一次 <code>match</code> 计算并判断，虽然写在 location 内部会好一些，但最好还是极力避免此语句。</p>
+<h3 id="toc_5">rewrite</h3>
+<p>rewrite 是对匹配到的请求进行 uri 重写，它可以被写在 <code>server/location/if</code> 模块中，使用方式 是 <code>rewrite ori dest type;</code>。在 server 模块中，rewrite 和 location 的执行顺序为：<code>server中的rewrite -&gt; location -&gt; location中的rewrite</code></p>
+<p>我们可以使用正则或全相等来匹配 <code>ori</code>，并将正则结果应用于 <code>dest</code> 上，如 <code>rewrite ^/api/common/test.json?(.*)$ /api_test.php?$1;</code> 则将 ori 内部的 query_string 匹配出来并使用 <code>$1</code> 赋值给 dest。</p>
+<p>rewrite 默认将 uri 重写后并不直接将请求分发到 CGI，而是将结果 uri 作为一个新的请求再次进行 server 模块内处理，如果循环重入超 10 次 nginx 会直接返回 <code>500 internal server error</code>，而控制 rewrite 匹配后的行为 主要依靠其 type 参数：</p>
+<ul>
+    <li>last 结束此模块(server/location) 匹配，并重入 server 模块处理，rewrite 默认使用此项;</li>
+    <li>break 结束所有模块匹配，直接将请求分发到 CGI；</li>
+    <li>redirect 直接分发请求，返回 Http 状态码 302 临时重定向；</li>
+    <li>permanment 直接分发请求，返回 Http 状态码 301 永久重定向；</li>
+</ul>
+<h3 id="toc_6">应用</h3>
+<p>介绍完了 Nginx 的重定向功能，还需要考虑怎么使用此功能进行代码的过渡。</p>
+<ol>
+    <li>使用 location 捕获对应接口；</li>
+    <li>使用 if 进行部分流量分发（可选）；</li>
+    <li>将请求 rewrite 到新模块。</li>
+</ol>
+<p>如：</p>
+<div>
+<pre class="line-numbers"><code class="language-nginx">location ~ /api/test.json {  # 匹配到 test 接口
+    if ($remote_addr ~* 1$) {  # 分流 IP 末位为 1 的请求
+        root new_dir/public; # 设置新项目的目录为根目录
+        rewrite ^(.*)$ /index.php$1 break; # 将请求分发到新项目的 index.php 入口文件
+    }
+    rewrite ^/api/test.json?(.*)$ /api_test.php?$1; # IP 末位不为 1 的请求继续访问旧项目
+}</code></pre>
+</div>
+<hr />
+<h1 id="toc_7">Linux链接</h1>
+<p>如上，我们发现如果针对每个接口进行一次 location 重定向，都需要写 7 行代码，即使不用 if 语句（多数情况如此），每次也需要 4 行代码。</p>
+<div>
+<pre class="line-numbers"><code class="language-nginx">location ~ /api/test.json {  # 匹配到 test 接口
+    root new_dir/public; # 设置新项目的目录为根目录
+    rewrite ^(.*)$ /index.php$1 break; # 将请求分发到新项目的 index.php 入口文件
+}</code></pre>
+</div>
+<p>如此下来，项目如果有 100 个接口，那么维护这100个 location 模块也颇为废劲。其实更多时刻，我们并不需要使用 location 语句，直接在 server 模块内部使用 rewrite 即可，而阻止我们直接使用 rewrite 的，就是由于新旧模块不在同一文件夹下，我们必须使用 root 语句将根目录定义到新项目下。至于为什么不将新旧项目的父文件夹定义为 root，是因为旧项目中有一些路径可能会有深坑。</p>
+<p>这里我们可以使用 linux 的 <code>软链接</code> 来 把新项目&ldquo;放置&rdquo;在旧项目下：linux 中软链接的功能就像 windows 中的<code>快捷方式</code>一样，是一个指向文件或真实目录的符号。至于其实现，就要说到 linux 文件结构中的重要概念 <code>inode</code> 了，不过这里不再多提。</p>
+<p>使用&nbsp;<code>ln -s /path/to/dir_new /path/to/dir_old/yaf</code> 在旧项目目录下创建一个 <code>yaf</code> 软链接指向新项目目录；</p>
+<p>这样，就可以以旧项目目录为根目录，找到新项目目录下的文件了，使用单行命令 <code>rewrite ^(/api/test.json(.*)$) /yaf/public/index.php$1 break;</code> 即可。</p>
+<hr />
+<h1 id="toc_8">框架内URL重写</h1>
+<p>通过上面 Nginx 的重定向，所有的请求都会被分发到 index.php 中， 接下来就需要在 yaf 内对 index.php 接收到的 Http 请求进行内部分发。</p>
+<p>yaf 提供了 <code>Yaf_Route_Static、Yaf_Route_Simple、Yaf_Route_Supervar、Yaf_Route_Map、Yaf_Route_Rewrite、Yaf_Route_Regex</code> 六种路由方式，各有其适合的场景，需要在 <code>/conf/application.ini</code> 中配置 <code>application.dispatcher.defaultRoute.type="type"</code>。</p>
+<p>我们的内部接口名完全不规则，有改写为 <code>.json</code> 后缀的，也有保持 <code>.php</code> 的，有带下划线的，也有大小写敏感的，找不到什么规律，于是使用了 <code>map</code> 类型，直接匹配 <code>uri</code> 然后映射向 controller 类。</p>
+<p>我们将 uri 和controller的映射统一保存在一个文件内，形如：</p>
+<div>
+<pre class="line-numbers"><code class="language-php">return array(
+    // 接口作用
+    'key' =&gt;
+        array(
+            'type' =&gt; 'rewrite',
+            'match' =&gt; '/api/test.json',
+            'route' =&gt;
+                array(
+                    'controller' =&gt; 'Api_Test'
+                ),
+        ),
+        ...
+    );</code></pre>
+</div>
+<p>然后在 <code>Bootstrap.php</code> 内加载此配置文件：</p>
+<div>
+<pre class="line-numbers"><code class="language-php">    public function _initRouter() {
+        $router = \Yaf\Dispatcher::getInstance()-&gt;getRouter();
+        $config = getConfig('rewrite_file_name');
+        $router-&gt;addConfig($config);
+    }</code></pre>
+</div>
+<p>自此，关于迁移的配置就完成了。</p>
+<hr />
+<h1 id="toc_9">测试</h1>
+<p>一次安全的迁移，完整的测试当然必不可少。在保证技术方案没问题的前提下，还要进行完整的业务逻辑测试。在 QA 测试之前，开发首先要通过尽可能完整的测试，将 BUG 率降到最低。</p>
+<p>我们的系统对外提供服务都是通过接口，这也方便了我们进行测试。为了保证测试的完整性，可以将线上流量引入到新代码中进行测试，而实行请求导流的最好媒介就是日志。</p>
+<p>一般来说，服务器都有完整的线上请求日志，如果有必要，在给特定接口添加特定日志以配合测试也是可以的。接入线上日志，构造跟线上一样的请求到测试服务器，再对比原始服务器的响应内容，将异常响应记录下来由开发分析并查找原因，直到最后新旧项目对所有请求的响应完全一致。</p>
+<hr />
+<h1 id="toc_10">小结</h1>
+<p>项目的重构不是一个小事，特别是大规模的项目代码迁移，执行它必须胆大心细，但每一次重构，无论是对自己的技术能力还是项目的生命周期都是很大的提升。</p>
+<p>虽然不鼓励没事就瞎折腾代码，但一定要时刻警惕，走出代码的舒适区，一定要提前预防根治代码疾病，不要在代码已经无可救药时才想到重构。</p>
+<p>技术发展迅速，代码总有过时的一天，所以经常对代码有目的有计划的小幅优化是非常有意义的。</p>
+<p>关于本文有什么问题可以在下面留言交流，如果您觉得本文对您有帮助，可以点击下面的 <strong><code>推荐</code></strong> 支持一下我，博客一直在更新，欢迎 <strong><code>关注</code></strong> 。</p>

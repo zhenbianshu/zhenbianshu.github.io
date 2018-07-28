@@ -1,0 +1,114 @@
+---
+layout: post
+title: "PHP模拟发送POST请求之一、HTTP协议头部解析"
+date: 2015-11-02 18:00:06 +0800
+comments: true
+---
+
+<p>　　WEB开发中信息基本全是在POST与GET请求与响应中进行，GET因其基于URL的直观，易被我们了解，可POST请求因其信息的隐蔽，在安全的同时，也给开发者们模拟发送带来了麻烦。接下来的几篇博文中，我将结合自己的笔记和理解，详细解释PHP进行POST请求的几种方法，如有错误，烦请指正。</p>
+<p>　　HTTP协议信息是WEB开发中的一项重要内容，了解它可以帮助我们更深刻地理解BS交互，也有利于我们从更底层理解WEB开发。HTTP协议是一种简单灵活方便的通讯协议，并且要记住，它是一种无状态的协议，即它是一种无记忆的协议，每一次的交互都是单独的。</p>
+<p>　　我们可以用浏览器的开发工具（IE的F12&nbsp;&nbsp;火狐的FireBug等）的&ldquo;网络&rdquo;面板来查看HTTP头信息。</p>
+<p>　　一般地HTTP头信息分为三类：请求信息，响应信息和交互信息（个人认为也是请求信息的一种）。</p>
+<p><span style="font-size: 18pt; font-family: 'Microsoft YaHei';"><strong>1，请求信息：</strong></span></p>
+<p><span style="font-family: 宋体;">　　</span>在访问一个网站时会由客户端发出请求信息，此信息不带有数据，只是单纯地向服务器接触，促使服务器返回响应信息。</p>
+<p>　　其格式为两部分：请求行和消息报头。</p>
+<p><strong><span style="font-size: 16px;">A.请求行：</span></strong>&nbsp;method（请求方法）&nbsp;&nbsp;path（请求站内地址）&nbsp;&nbsp;&nbsp;HTTP/version（协议/版本信息）</p>
+<p>　　常见的请求方法有GET/POST/HEAD/OPTION等</p>
+<p><span style="font-size: 16px;"><strong>B.<span style="font-family: 宋体;">消息报头：</span></strong></span></p>
+<p>　　Host(必须):主机和端口号，端口号默认为80</p>
+<p>　　Accept:期望接收内容类型(image/gif&nbsp;&nbsp;text/html&nbsp;&nbsp;&nbsp;*/*)</p>
+<p>　　Accept-Encoding:期望接收的压缩类型(gzip&nbsp;deflat)</p>
+<p>　　Accept-Charset:期望接收的字符集(utf-8)</p>
+<p>　　Accept-Language(zh-CN)</p>
+<p>　　Cookie:用户的Cookie信息</p>
+<p>　　Connection:连接控制</p>
+<p>　　User-Agent:客户端信息</p>
+<p>　　...&nbsp;...</p>
+<p>以下是一个典型的请求头信息：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #000000;">GET  index.php  HTTP/1.1
+
+Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+Accept-Encoding:gzip, deflate, sdch
+Accept-Language:zh-CN,zh;q=0.8
+Cache-Control:max-age=0
+Connection:keep-alive
+Cookie:SOHUHOMETAB=visit:2; IPLOC=CN1407; SUV=1510312046259910
+Host:www.sohu.com
+If-Modified-Since:Sat, 31 Oct 2015 12:45:22 GMT
+Upgrade-Insecure-Requests:1
+User-Agent:Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.99 Safari/537.36 </span></pre>
+</div>
+<p>&nbsp;</p>
+<p><span style="font-size: 18pt; font-family: 'Microsoft YaHei';"><strong>2</strong><strong>，响应信息</strong>&nbsp;</span></p>
+<p><span style="font-family: 宋体;">　</span>　服务器返回数据</p>
+<p>　　响应信息分为三部分：状态行&nbsp;消息报头&nbsp;响应正文</p>
+<p><strong><span style="font-size: 16px;">A.状态行：</span></strong>HTTP/version（协议/版本信息）&nbsp;&nbsp;状态码&nbsp;&nbsp;&nbsp;状态文本（对状态码的文本描述）</p>
+<p>　　状态码共有5类：</p>
+<p>　　　　1XX：表示临时响应，需要请求者继续操作</p>
+<p>　　　　2XX：表示响应成功，服务器成功地响应了请求</p>
+<p>　　　　3XX：表示重定向，需要请求者进一步操作</p>
+<p>　　　　4XX：表示客户端错误，服务器无法正常响应</p>
+<p>　　　　5XX：表示服务器端错误，服务器无法正常响应</p>
+<p>具体信息可参考：<a href="http://tool.oschina.net/commons?type=5">HTTP状态码详解</a></p>
+<p><span style="font-size: 16px;"><strong>B.<span style="font-family: 宋体;">消息报头：</span></strong></span></p>
+<p>　　Server:服务器信息</p>
+<p>　　Content-Encoding:数据压缩格式</p>
+<p>　　Content-Length:数据长度</p>
+<p>　　Content-Type:数据类型</p>
+<p>　　Cache-Control:缓存控制</p>
+<p>　　Connection:连接控制</p>
+<p>　　Date:日期信息</p>
+<p>　　Expires:返回数据的过期信息</p>
+<p>　　Last-Modified:返回最后的修改时间</p>
+<p>　　Set-Cookie:设置客户端的Cookie信息</p>
+<p>　　... ...</p>
+<p><strong><span style="font-size: 16px;">C.</span></strong><span style="font-family: 宋体;"><strong><span style="font-size: 16px;">响应正文</span></strong>&nbsp;</span></p>
+<p><span style="font-family: 宋体;">　</span>　即返回的页面数据，在页面以HTML文档形式表现出来。</p>
+<p>以下是常见的响应消息</p>
+<div class="cnblogs_code">
+<pre><span style="color: #000000;">HTTP/1.1  200  OK
+
+Cache-Control:no-cache
+Connection:close
+Content-Encoding:gzip
+Content-Length:6947
+Content-Type:text/html; charset=GBK
+Date:Sat, 31 Oct 2015 13:30:11 GMT
+Expires:-1
+Pragma:no-cache
+Proxy-Connection:keep-alive
+Server:nginx/1.2.5
+Set-Cookie:JSESSIONID=yiuug4yejhc1cdbzydoxlcpn;Path=/</span></pre>
+</div>
+<p><span style="font-size: 18pt; font-family: 'Microsoft YaHei';"><strong>3</strong><strong>，交互信息</strong></span></p>
+<p><span style="font-family: 宋体;">　</span>　是包含了请求数据的请求信息&nbsp;常见于用户上传文件&nbsp;注册等</p>
+<p>　　其分为三部分：请求行&nbsp;消息报头&nbsp;请求正文</p>
+<p><strong><span style="font-size: 16px;">A.与请求信息的请求行相同</span></strong></p>
+<p><strong><span style="font-size: 16px;">B.<span style="font-family: 宋体;">在请求报头的基础上添加了有关请求正文的数据</span></span></strong></p>
+<p>　　Content-Type:上传信息的内容类型</p>
+<p>　　Content-Length:上传信息的长度</p>
+<p>　　... ...</p>
+<p><strong><span style="font-size: 16px;">C.</span></strong><span style="font-family: 宋体;"><strong><span style="font-size: 16px;">请求正文：</span></strong></span></p>
+<p><span style="font-family: 宋体;">　</span>　即请求的具体数据串（name=xxx&amp;passwork=xxx），当然为了安全起见，有时会对POST信息加密编码。</p>
+<p>以下是典型的请求消息：</p>
+<div class="cnblogs_code">
+<pre><span style="color: #000000;">GET  login.php  HTTP/1.1
+
+Host:passport.sohu.com
+Accept:text/html,application/xhtml+xml,application/xml
+Accept-Encoding:gzip, deflate
+Accept-Language:zh-CN,zh;q=0.8
+Cache-Control:max-age=0
+Connection:keep-alive
+Content-Length:166
+Content-Type:application/x-www-form-urlencoded
+Referer:http://mail.sohu.com/
+User-Agent:Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.99 Safari/537.36
+
+Form Data
+domain=sohu.com</span><span style="color: #ff0000;">&amp;callback</span>=passport20008375022711697966_cb1446298206568<span style="color: #ff0000;">&amp;appid</span>=1113<span style="color: #ff0000;">&amp;userid</span>=FDFFDF%40sohu.com<span style="color: #ff0000;">&amp;password</span>=a3f4384c2bc44fa909ffd0ecc5fa8eb9<span style="color: #ff0000;">&amp;persistentcookie</span>=0</pre>
+</div>
+<p>&nbsp;明白了浏览器都往服务器上发送了些什么，那用其他方法伪装成一个服务器也就不是难事了。</p>
+<p>下一节我会介绍PHP和JS处理最基本URL的方式，解决GET请求部分的同时，也将模拟发送POST请求的准备做足。</p>
+<p>如果您觉得本博文对您有帮助，您可以推荐或点赞，如果您有什么问题，也可以在下方留言，一块讨论，谢谢。</p>

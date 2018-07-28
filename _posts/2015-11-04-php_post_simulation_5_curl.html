@@ -1,0 +1,225 @@
+---
+layout: post
+title: "PHP模拟发送POST请求之五、curl基本使用和多线程优化"
+date: 2015-11-04 18:00:08 +0800
+comments: true
+---
+
+<p>今天来介绍PHP模拟发送POST请求的重型武器&mdash;&mdash;cURL函数库的使用和其多线程的优化方法。</p>
+<p>说起cURL函数，可谓是老生常谈，但网上许多资料都在关键部分语焉不详，列出一大堆手册上的东西，搞得我入门时也万分痛苦，我翻了些资料，结合自己的笔记，总结了这篇博文，希望能给初次接触cURL的开发者提供一些帮助。</p>
+<hr />
+<p>&nbsp;</p>
+<p><span style="font-family: 'Microsoft YaHei';"><strong><span style="font-size: 18pt;">cURL的基本使用步骤</span></strong></span></p>
+<p>首先来介绍cURL:</p>
+<p>cURL按照HTTP头信息来模拟浏览器传输数据，它支持FTP,&nbsp;FTPS,&nbsp;HTTP,&nbsp;HTTPS,&nbsp;DICT,&nbsp;FILE等协议，拥有HTTPS认证，HTTP&nbsp;POST方法，HTTP&nbsp;PUT方法，FTP上传，HTTP上传，代理服务器，cookies，用户名/密码认证等功能。cURL可谓是实现爬站抓取网页、POST数据等功能的利器。</p>
+<p>使用cURL函数主要分为四部分：</p>
+<p>1.初始化cURL。</p>
+<p>2.设置cURL变量，这是cRUL的核心，扩展功能全靠这一步骤。</p>
+<p>3.执行cURL,获取结果。</p>
+<p>4.关闭连接，回收资源。</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$ch</span> = curl_init();<span style="color: #008000;">//</span><span style="color: #008000;">1</span>
+<span style="color: #000000;">
+curl_setopt(</span><span style="color: #800080;">$ch</span>, CURLOPT_URL, "http://localhost");<span style="color: #008000;">//</span><span style="color: #008000;">2</span>
+
+<span style="color: #800080;">$output</span> = curl_exec(<span style="color: #800080;">$ch</span>);<span style="color: #008000;">//</span><span style="color: #008000;">3</span>
+<span style="color: #000000;">
+curl_close(</span><span style="color: #800080;">$ch</span>);<span style="color: #008000;">//</span><span style="color: #008000;">4</span></pre>
+</div>
+<p>另外，我们还可以使用curl_getinfo($ch)函数获取curl执行的信息，其结果为一个数组</p>
+<p>$info数组的内容包括如下等内容：</p>
+<ul>
+    <li>&ldquo;url&rdquo;&nbsp;//资源网络地址&nbsp;</li>
+    <li>&ldquo;content_type&rdquo;&nbsp;//内容编码&nbsp;</li>
+    <li>&ldquo;http_code&rdquo;&nbsp;//HTTP状态码&nbsp;&nbsp;</li>
+    <li>&ldquo;filetime&rdquo;&nbsp;//文件创建时间&nbsp;</li>
+    <li>&ldquo;total_time&rdquo;&nbsp;//总耗时&nbsp;</li>
+    <li>&ldquo;size_upload&rdquo;&nbsp;//上传数据的大小&nbsp;</li>
+    <li>&ldquo;size_download&rdquo;&nbsp;//下载数据的大小&nbsp;</li>
+    <li>&ldquo;speed_download&rdquo;&nbsp;//下载速度&nbsp;</li>
+    <li>&ldquo;speed_upload&rdquo;&nbsp;//上传速度&nbsp;</li>
+    <li>&ldquo;download_content_length&rdquo;//下载内容的长度&nbsp;</li>
+    <li>&ldquo;upload_content_length&rdquo;&nbsp;//上传内容的长度&nbsp;</li>
+</ul>
+<hr />
+<p>&nbsp;</p>
+<p><span style="font-size: 18pt;"><strong><span style="font-family: 'Microsoft YaHei';">cURL的常用设置</span></strong></span></p>
+<p>下面详细介绍curl使用第二步时常用的变量设置，在使用curl函数时，可以按各种需求来设置。</p>
+<p><span style="font-family: 黑体;"><strong><span style="font-size: 14pt;">设置基本信息：</span></strong></span></p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_URL,&nbsp;$string);//设置curl的目录地址</p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_PORT,&nbsp;$port);//设置连接端口，一般不设置默认80</p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_RETURNTRANSFER,&nbsp;1);//返回结果流，并不是输出它留待后续处理，一般会设置这一项，稍后处理抓取到的信息，而不是直接输出出来。</p>
+<p><strong><span style="font-family: 黑体; font-size: 14pt;">设置POST数据信息：</span></strong></p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_POST,&nbsp;1);//设置传送数据方式为POST</p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_POSTFIELDS,&nbsp;$string);//设置要传输的数据</p>
+<p><strong><span style="font-size: 14pt; font-family: 黑体;">设置验证信息：</span></strong></p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_COOKIE,&nbsp;$string);//设置curl执行时所携带的Cookie信息</p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_USERAGENT,&nbsp;$string);//设置curl模拟的浏览器信息</p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_REFERER,&nbsp;$string);//设置header中的referer,有利于破解防盗链</p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_USERPWD,&nbsp;$string);//传递一个连接中需要的用户名和密码，格式为："[username]:[password]"</p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_FOLLOWLOCATION,&nbsp;1);//设置允许服务器重定向</p>
+<p><strong><span style="font-size: 14pt; font-family: 黑体;">设置强化信息：</span></strong></p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_NOBODY,&nbsp;1);//设置不允许输出HTML&nbsp;body体，如果在抓取页面标题等信息时设置此选项会大大加快速度</p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_TIMEOUT,&nbsp;$int);//设置允许执行的最长秒数（超时时间），设置数值小的时候，CURL会放弃执行时间长的页面</p>
+<p>curl_setopt($ch,&nbsp;CURLOPT_HEADER,&nbsp;1);//设置允许将读取目标时产生的header头文件包含在输出流中</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">cURL批处理功能的基本使用</span></strong></p>
+<p>当然cURL的功能并不止于此，在手册上你可以找到它更多的变量设置。而且cURL最强大的地方在其批处理功能。</p>
+<p>cURL的批处理似乎也很好理解，以下是一般步骤：</p>
+<p>1.$mh&nbsp;=&nbsp;curl_multi_init();//初始化一个批处理句柄。</p>
+<p>2.curl_multi_add_handle($mh,$ch);&nbsp;//往批处理句柄中添加设置好的$ch句柄。</p>
+<p>3.curl_multi_exec($mh,$running);//执行$mh句柄，并将$mh句柄的运行状态写入$running变量中</p>
+<p>4.当$running为true时循环执行curl_multi_close()函数</p>
+<p>5.循环结束后遍历$mh句柄，用curl_multi_getcontent()获取第一个句柄的返回值</p>
+<p>6.用curl_multi_remove_handle()将$mh中的句柄移除</p>
+<p>7.用curl_multi_close()关闭$mh批处理句柄。</p>
+<p>代码如下：</p>
+<div class="cnblogs_code">
+<pre> &lt;?<span style="color: #000000;">php
+
+        </span><span style="color: #800080;">$chArr</span>=<span style="color: #000000;">[];
+
+        </span><span style="color: #0000ff;">for</span>(<span style="color: #800080;">$i</span>=0;<span style="color: #800080;">$i</span>&lt;50;<span style="color: #800080;">$i</span>++<span style="color: #000000;">){
+
+            　 </span><span style="color: #800080;">$chArr</span>[<span style="color: #800080;">$i</span>]=curl_init("http://www.baidu.com"<span style="color: #000000;">);
+
+             　curl_setopt(</span><span style="color: #800080;">$chArr</span>[<span style="color: #800080;">$i</span>],CURLOPT_RETURNTRANSFER,1<span style="color: #000000;">);
+
+        }
+
+       </span><span style="color: #800080;">$mh</span> = curl_multi_init(); <span style="color: #008000;">//</span><span style="color: #008000;">1</span>
+
+       <span style="color: #0000ff;">foreach</span>(<span style="color: #800080;">$chArr</span> <span style="color: #0000ff;">as</span> <span style="color: #800080;">$k</span> =&gt; <span style="color: #800080;">$ch</span><span style="color: #000000;">){
+
+       　　curl_multi_add_handle(</span><span style="color: #800080;">$mh</span>,<span style="color: #800080;">$ch</span>); <span style="color: #008000;">//</span><span style="color: #008000;">2</span>
+<span style="color: #000000;">　　　　
+　　　　}
+
+       </span><span style="color: #800080;">$running</span> = <span style="color: #0000ff;">null</span><span style="color: #000000;">;
+
+       </span><span style="color: #0000ff;">do</span><span style="color: #000000;">{
+
+         　　curl_multi_exec(</span><span style="color: #800080;">$mh</span>,<span style="color: #800080;">$running</span>); <span style="color: #008000;">//</span><span style="color: #008000;">3</span>
+<span style="color: #000000;">
+        }</span><span style="color: #0000ff;">while</span>(<span style="color: #800080;">$running</span> &gt; 0); <span style="color: #008000;">//</span><span style="color: #008000;">4</span>
+
+        <span style="color: #0000ff;">foreach</span>(<span style="color: #800080;">$chArr</span> <span style="color: #0000ff;">as</span> <span style="color: #800080;">$k</span> =&gt; <span style="color: #800080;">$ch</span><span style="color: #000000;">){
+
+              </span><span style="color: #800080;">$result</span>[<span style="color: #800080;">$k</span>]= curl_multi_getcontent(<span style="color: #800080;">$ch</span>); <span style="color: #008000;">//</span><span style="color: #008000;">5</span>
+<span style="color: #000000;">
+              curl_multi_remove_handle(</span><span style="color: #800080;">$mh</span>,<span style="color: #800080;">$ch</span>);<span style="color: #008000;">//</span><span style="color: #008000;">6</span>
+<span style="color: #000000;">
+        }
+
+        curl_multi_close(</span><span style="color: #800080;">$mh</span>); <span style="color: #008000;">//</span><span style="color: #008000;">7</span>
+
+      ?&gt;    </pre>
+</div>
+<p>&nbsp;</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">cURL批处理时内存占用过多的问题</span></strong></p>
+<p>但是，执行大批量的句柄时我们会发现一个很严重的问题，那就是执行时系统CPU占用率几乎100%，几乎是死机状态了。纠其原因，那是因为在$running&gt;0,执行&nbsp;&nbsp;curl_multi_exec($mh,$running)而整个批处理句柄没有全部执行完毕时，系统会不停地执行curl_multi_exec()函数。我们用实验来证明：</p>
+<p>我们在循环中curl_multi_exec($mh,$running)句前加入一个echo&nbsp;"a";的语句。我们的目的是执行50次对百度的访问，然后来看一下结果。</p>
+<p>&nbsp;<img src="/images/819496-20151104125511883-2016503131.png" alt="" /></p>
+<p>从图中滚动条的大小(滚动条已经最小状态了)可以大概看出输出a的个数，500个也不止，所以我们便可以找到占用CPU的罪魁祸首了。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">cURL批处理时的内存优化方案</span></strong></p>
+<p>进行改动的方式是应用curl函数库中的curl_multi_select()函数，其函数原型如下： &nbsp;</p>
+<blockquote>
+    <p>int&nbsp;curl_multi_select&nbsp;(&nbsp;resource&nbsp;$mh&nbsp;[,&nbsp;float&nbsp;$timeout&nbsp;=&nbsp;1.0&nbsp;]&nbsp;)</p>
+    <p>阻塞直到cURL批处理连接中有活动连接。成功时返回描述符集合中描述符的数量。失败时，select失败时返回-1，否则返回超时(从底层的select系统调用)。</p>
+</blockquote>
+<p>我用们curl_multi_select()函数来达到没有需要读取的程序就阻塞住的目的。</p>
+<p>我们对批处理的第3、4步进行优化，利用其多线程，模拟并发程序。</p>
+<p>很多朋友会对手册中提供的代码心存疑惑（我一开始也是），下面的代码及解释。</p>
+<div class="cnblogs_code">
+<pre><span style="color: #800080;">$running</span> = <span style="color: #0000ff;">null</span><span style="color: #000000;">;
+
+</span><span style="color: #0000ff;">do</span><span style="color: #000000;"> {
+
+    </span><span style="color: #800080;">$mrc</span> = curl_multi_exec(<span style="color: #800080;">$mh</span>, <span style="color: #800080;">$running</span><span style="color: #000000;">);
+
+} </span><span style="color: #0000ff;">while</span> (<span style="color: #800080;">$mrc</span> ==<span style="color: #000000;"> CURLM_CALL_MULTI_PERFORM);
+
+</span><span style="color: #008000;">//</span><span style="color: #008000;">本次循环第一次处理$mh批处理中的$ch句柄，并将$mh批处理的执行状态写入$running,当状态值等于CURLM_CALL_MULTI_PERFORM时，表明数据还在写入或读取中，执行循环，当第一次$ch句柄的数据写入或读取成功后，状态值变为CURLM_OK，跳出本次循环，进入下面的大循环之中。
+
+//$running为true，即$mh批处理之中还有$ch句柄正待处理，$mrc==CURLM_OK,即上一次$ch句柄的读取或写入已经执行完毕。</span>
+
+<span style="color: #0000ff;">while</span> (<span style="color: #800080;">$running</span> &amp;&amp; <span style="color: #800080;">$mrc</span> ==<span style="color: #000000;"> CURLM_OK) {
+
+    </span><span style="color: #0000ff;">if</span> (curl_multi_select(<span style="color: #800080;">$mh</span>) != -1) {<span style="color: #008000;">//</span><span style="color: #008000;">$mh批处理中还有可执行的$ch句柄，curl_multi_select($mh) != -1程序退出阻塞状态。</span>
+
+        <span style="color: #0000ff;">do</span> {                            <span style="color: #008000;">//</span><span style="color: #008000;">继续执行需要处理的$ch句柄。</span>
+
+            　<span style="color: #800080;">$mrc</span> = curl_multi_exec(<span style="color: #800080;">$mh</span>, <span style="color: #800080;">$running</span><span style="color: #000000;">);
+
+        } </span><span style="color: #0000ff;">while</span> (<span style="color: #800080;">$mrc</span> ==<span style="color: #000000;"> CURLM_CALL_MULTI_PERFORM);
+
+    }
+
+}</span></pre>
+</div>
+<p>这样执行的好处是$mh批处理中的$ch句柄会在读取或写入数据结束后($mrc==CURLM_OK),进入curl_multi_select($mh)的阻塞阶段，而不会在整个$mh批处理执行时不停地执行curl_multi_exec,白白浪费CPU资源。</p>
+<hr />
+<p>&nbsp;</p>
+<p><strong><span style="font-size: 18pt; font-family: 'Microsoft YaHei';">cURL批处理的内存优化结果</span></strong></p>
+<p>完整代码如下：</p>
+<div class="cnblogs_code">
+<pre>&lt;?<span style="color: #000000;">php
+
+        </span><span style="color: #800080;">$chArr</span>=<span style="color: #000000;">[];
+
+        </span><span style="color: #0000ff;">for</span>(<span style="color: #800080;">$i</span>=0;<span style="color: #800080;">$i</span>&lt;50;<span style="color: #800080;">$i</span>++<span style="color: #000000;">){
+
+        </span><span style="color: #800080;">$chArr</span>[<span style="color: #800080;">$i</span>]=curl_init("http://www.baidu.com"<span style="color: #000000;">);
+
+        curl_setopt(</span><span style="color: #800080;">$chArr</span>[<span style="color: #800080;">$i</span>],CURLOPT_RETURNTRANSFER,1<span style="color: #000000;">);
+
+        }
+
+       </span><span style="color: #800080;">$mh</span> =<span style="color: #000000;"> curl_multi_init();
+
+        </span><span style="color: #0000ff;">foreach</span>(<span style="color: #800080;">$chArr</span> <span style="color: #0000ff;">as</span> <span style="color: #800080;">$k</span> =&gt; <span style="color: #800080;">$ch</span><span style="color: #000000;">)
+
+        curl_multi_add_handle(</span><span style="color: #800080;">$mh</span>,<span style="color: #800080;">$ch</span><span style="color: #000000;">); <br />
+        </span><span style="color: #800080;">$running</span> = <span style="color: #0000ff;">null</span><span style="color: #000000;">;
+
+        </span><span style="color: #0000ff;">do</span><span style="color: #000000;"> {
+<br /></span><span style="color: #800080;">　　　　　　　　$mrc</span> = curl_multi_exec(<span style="color: #800080;">$mh</span>, <span style="color: #800080;">$running</span><span style="color: #000000;">);
+
+　　　　　} </span><span style="color: #0000ff;">while</span> (<span style="color: #800080;">$mrc</span> ==<span style="color: #000000;"> CURLM_CALL_MULTI_PERFORM);
+
+
+　　　　</span><span style="color: #0000ff;">while</span> (<span style="color: #800080;">$running</span> &amp;&amp; <span style="color: #800080;">$mrc</span> ==<span style="color: #000000;"> CURLM_OK) {
+
+   　　　　 　</span><span style="color: #0000ff;">if</span> (curl_multi_select(<span style="color: #800080;">$mh</span>) != -1<span style="color: #000000;">) {
+
+       　　　　　　</span><span style="color: #0000ff;">do</span><span style="color: #000000;"> {
+
+            　　　　　　</span><span style="color: #800080;">$mrc</span> = curl_multi_exec(<span style="color: #800080;">$mh</span>, <span style="color: #800080;">$running</span><span style="color: #000000;">);
+
+        　　　　　} </span><span style="color: #0000ff;">while</span> (<span style="color: #800080;">$mrc</span> ==<span style="color: #000000;"> CURLM_CALL_MULTI_PERFORM);
+
+    　　　　　}
+
+　　　　}
+
+       </span><span style="color: #0000ff;">foreach</span>(<span style="color: #800080;">$chArr</span> <span style="color: #0000ff;">as</span> <span style="color: #800080;">$k</span> =&gt; <span style="color: #800080;">$ch</span><span style="color: #000000;">){
+
+               </span><span style="color: #800080;">$result</span>[<span style="color: #800080;">$k</span>]= curl_multi_getcontent(<span style="color: #800080;">$ch</span><span style="color: #000000;">);
+
+               curl_multi_remove_handle(</span><span style="color: #800080;">$mh</span>,<span style="color: #800080;">$ch</span><span style="color: #000000;">);
+
+       }
+
+        curl_multi_close(</span><span style="color: #800080;">$mh</span><span style="color: #000000;">);
+
+      </span>?&gt;</pre>
+</div>
+<p>我们再次在&nbsp;$mrc&nbsp;=&nbsp;curl_multi_exec($mh,&nbsp;$running)句子前加入echo&nbsp;"a";结果如下图：<img src="/images/819496-20151104130116571-599187256.png" alt="" /></p>
+<p>虽然也不止50次，但是比之未优化前，CPU使用率已经大为改观。</p>
+<p>虽然curl函数非常强大，但是我们还是有使用其他函数来发送POST请求的机会，另外也能从更底层了解curl函数，所以本辑也用大很大篇幅在其他函数上。</p>
+<p>OK，本辑结束，写这辑博文的同时，我也学习到了很多。如果您觉得本博文对您有帮助，请您点推荐或关注我，我们继续分享我的笔记总结。如果有什么问题，您可以在下方留言讨论，谢谢阅读。</p>
