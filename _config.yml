@@ -11,7 +11,7 @@ gaaccount: ''
 comments: true
 disqus: 'zhenbianshu'
 
-permalink: /:year/:month/:title
+permalink: /:year/:month/:title.html
 paginate: 3
 
 highlighter: rouge
