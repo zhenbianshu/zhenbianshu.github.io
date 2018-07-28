@@ -6,7 +6,7 @@ comments: true
 ---
 
 <h1 id="toc_0">前言</h1>
-<p>进程间通信是一个永远的话题，我的上一篇文章通过一个并发循环ID生成器的实现介绍了如何使用外部介质来进行进程间通信：<a href="http://www.cnblogs.com/zhenbianshu/p/6388777.html">从并发处理谈PHP进程间通信（一）外部介质</a> 。介绍的几种方法适用于各种语言，但是他们都依赖于一种外部介质，文化的读写有瓶颈，mysql 和 redis 会挂掉或连接超时，归根结底总觉得在 HACK；</p>
+<p>进程间通信是一个永远的话题，我的上一篇文章通过一个并发循环ID生成器的实现介绍了如何使用外部介质来进行进程间通信：<a href="./php_ipc_outer_media.html">从并发处理谈PHP进程间通信（一）外部介质</a> 。介绍的几种方法适用于各种语言，但是他们都依赖于一种外部介质，文化的读写有瓶颈，mysql 和 redis 会挂掉或连接超时，归根结底总觉得在 HACK；</p>
 <p>对于进程间通信，每一个完备的语言都应该有对应的处理方式，而 PHP 对应的则是一族对 UNIX SYSTEM V包装的函数，包括信号量（semaphore）、共享内存（shared memory）和消息队列（msg queue）的操作。</p>
 <p>它的安装和使用非常简单，在编译 PHP 时添加 <code>--enable-sysvsem --enable-sysvshm --enable-sysvmsg</code> 参数就可以，当然 Windows 上无法使用。</p>
 <p>今天我们仍旧使用上一篇文章的例子来介绍 PHP 内部实现的进程间通信，在了解它们的具体使用之前，先简单介绍一下信号量、共享内存、消息队列的概念。</p>

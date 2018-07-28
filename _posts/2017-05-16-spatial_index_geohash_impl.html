@@ -36,7 +36,7 @@ comments: true
     <li>这样，我们划分 20 次，方格的精度（见文末对照表）已达到 2m，得到经度的标识二进制串为<code>11010010101011110111</code>;</li>
     <li>对纬度同样划分，得到纬度的标识二进制串为<code>10111000111100100111</code>;</li>
     <li>我们对它组合，得到40位的二进制串<code>11011 01110 00010 01110 11100 10111 01001 11111</code>;</li>
-    <li>我们将这个二进制串使用 <code>base32</code>编码（原理同base64，可以见我的另一篇文章：<a href="http://www.cnblogs.com/zhenbianshu/p/6163157.html">WEB开发中的字符集和编码</a>，位编码映射表见下），得到 GeoHash 编码为 <code>3OCO4XJ7</code>;</li>
+    <li>我们将这个二进制串使用 <code>base32</code>编码（原理同base64，可以见我的另一篇文章：<a href="../../2016/12/charset_coding_in_web.html">WEB开发中的字符集和编码</a>，位编码映射表见下），得到 GeoHash 编码为 <code>3OCO4XJ7</code>;</li>
 </ol>
 <p>那么GeoHash编码前缀为 <code>3OCO4XJ7</code>的地理点就是离 (116.276349, 40.040875)两米内的点。如果我们把地理位置点和其GeoHash编码存入数据库的话，我们要查找 附近两米点的点，只需要限定条件 <code>geo_code like '3OCO4XJ7%'</code>就行了;</p>
 <h3 id="toc_5">边界点问题</h3>

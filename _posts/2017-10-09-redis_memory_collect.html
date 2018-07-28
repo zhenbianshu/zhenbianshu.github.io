@@ -8,7 +8,7 @@ comments: true
 <h1>前言</h1>
 <p>Redis 应该是开发者最常用的缓存服务器了，它丰富的数据结构，快速高效的内存操作能帮助开发者迅速完成复杂功能的设计，可以说让人一旦使用过后很难再离开它了，甚至在一些业务中，完全可以用 Redis 替代传统的关系型数据库 Mysql。</p>
 <p>作为一个内存型数据库，Redis 经常会遇到内存问题，今天我们来谈一下 Redis 常见的内存满的问题，介绍一下给 Redis &ldquo;瘦身&rdquo;的通用方式。</p>
-<p>文章经常被人爬，而且还不注明原地址，我在这里的更新和纠错没法同步，这里注明一下原文地址：http://www.cnblogs.com/zhenbianshu/p/7642682.html 以防误人子弟。</p>
+<p>{{site.article.copyright}}</p>
 <hr />
 <h1 id="toc_1">Redis内存回收</h1>
 <p>Redis 服务器的最大占用内存量由配置项 <code>maxmemory</code> 决定，我们可以通过 <code>config set maxmemory 2GB</code> 的格式来配置。一旦 Redis 内存满，所有引起内存增加的操作都会被返回 error。作为专业 Redis 服务器我们通常将此项设置为<code>0</code>，以服务器系统内存来作为限制；</p>
@@ -49,7 +49,7 @@ comments: true
 0 =&gt; cursor, // cursor = 0 遍历结束
 1 =&gt; array(key1, key2...)</code></pre>
 </div>
-<p>需要注意的是 SCAN 命令是在版本<code>2.8.0</code> 加入的，如果是之前的版本，可以考虑解析 Redis 的 RDB 文件来获取所有的键。有坑，参见我之前的文章：<a href="http://www.cnblogs.com/zhenbianshu/p/7486530.html">扩充你的工具箱 - 大行文件的处理</a></p>
+<p>需要注意的是 SCAN 命令是在版本<code>2.8.0</code> 加入的，如果是之前的版本，可以考虑解析 Redis 的 RDB 文件来获取所有的键。有坑，参见我之前的文章：<a href="../09/process_big_line_file.html">扩充你的工具箱 - 大行文件的处理</a></p>
 <h3 id="toc_7">如何判断键是否垃圾</h3>
 <p>我们有三种异常键需要处理：</p>
 <ul>

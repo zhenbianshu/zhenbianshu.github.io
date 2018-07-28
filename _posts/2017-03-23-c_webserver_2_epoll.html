@@ -6,7 +6,7 @@ comments: true
 ---
 
 <h1 id="toc_0">前言</h1>
-<p>继续更新&ldquo;用 C 写一个 web 服务器&rdquo;项目（上期链接：<a href="http://www.cnblogs.com/zhenbianshu/p/6550511.html">用C写一个web服务器（一） 基础功能</a>），本次更新选择了 I/O 模型的优化，因为它是服务器的基础，这个先完成的话，后面的优化就可以选择各个模块来进行，不必进行全局化的改动了。</p>
+<p>继续更新&ldquo;用 C 写一个 web 服务器&rdquo;项目（上期链接：<a href="./c_webserver_1_basic_function.html">用C写一个web服务器（一） 基础功能</a>），本次更新选择了 I/O 模型的优化，因为它是服务器的基础，这个先完成的话，后面的优化就可以选择各个模块来进行，不必进行全局化的改动了。</p>
 <h3 id="toc_1">I/O模型</h3>
 <p>接触过 socket 编程的同学应该都知道一些 I/O 模型的概念，linux 中有阻塞 I/O、非阻塞 I/O、I/O 多路复用、信号驱动 I/O 和 异步 I/O 五种模型。</p>
 <p>其他模型的具体概念这里不多介绍，只简单地提一下自己理解的 I/O 多路复用：简单的说就是由一个进程来管理多个 socket，即将多个 socket 放入一个表中，在其中有 socket 可操作时，通知进程来处理， I/O 多路复用的实现方式有 select、poll 和 epoll。</p>

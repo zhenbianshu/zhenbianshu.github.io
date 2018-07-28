@@ -149,7 +149,7 @@ sentinel failover-timeout mymaster 900000        //在90000秒内哨兵不再试
 </code></pre>
 <hr />
 <h1>PHP操作redis服务器</h1>
-<p>安装好php的redis扩展后(具体看我的博文<a href="http://www.cnblogs.com/zhenbianshu/p/4999588.html">linux下的PHP</a>)，就可以直接使用redis的类函数库了。</p>
+<p>安装好php的redis扩展后(具体看我的博文<a href="../11/php_on_linux.html">linux下的PHP</a>)，就可以直接使用redis的类函数库了。</p>
 <p>如下是典型的redis应用。</p>
 <pre><code>$redis=new Redis();                     //实例化一个Redis对象
 $redis-&gt;connect('host',port);           //连接redis服务器

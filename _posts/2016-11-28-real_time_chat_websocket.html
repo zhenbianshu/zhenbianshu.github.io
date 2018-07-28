@@ -7,7 +7,7 @@ comments: true
 
 <p><span style="color: #000000; font-size: 28px; font-weight: bold;">前言</span></p>
 <p>websocket 作为 HTML5 里一个新的特性一直很受人关注，因为它真的非常酷，打破了 http &ldquo;请求-响应&rdquo;的常规思维，实现了服务器向客户端主动推送消息，本文介绍如何使用 PHP 和 JS 应用 websocket 实现一个网页实时聊天室；</p>
-<p>以前写过一篇文章讲述如何使用ajax长轮询实现网页实时聊天，见链接： <a href="http://www.cnblogs.com/zhenbianshu/p/4964095.html">网页实时聊天之js和jQuery实现ajax长轮询</a> ，但是轮询和服务器的 pending 都是无谓的消耗，websocket 才是新的趋势。</p>
+<p>以前写过一篇文章讲述如何使用ajax长轮询实现网页实时聊天，见链接： <a href="../../2015/11/real_time_chat_long_polling.html">网页实时聊天之js和jQuery实现ajax长轮询</a> ，但是轮询和服务器的 pending 都是无谓的消耗，websocket 才是新的趋势。</p>
 <p>最近艰难地&ldquo;挤&rdquo;出了一点时间，完善了很早之前做的 websocket &ldquo;请求-原样返回&rdquo;服务器，用js完善了下客户端功能，把过程和思路分享给大家，顺便也普及一下 websocket 相关的知识，当然现在讨论 websocket 的文章也特别多，有些理论性的东西我也就略过了，给出参考文章供大家选择阅读。</p>
 <p>正文开始前，先贴一张聊天室的效果图（请不要在意CSS渣的页面）：</p>
 <p><img src="/images/819496-20161128203834677-823596906.png" alt="" /></p>
@@ -183,7 +183,7 @@ ws.onerror = function () {
 <ul>
     <li>页面美化（信息添加颜色等）</li>
     <li>服务器识别 '@' 字符而只向某一个 socket 写数据实现聊天室的私聊；</li>
-    <li>多进程（使用 redis 等缓存数据库来实现资源的共享），可参考我以前的一篇文章： <a href="http://www.cnblogs.com/zhenbianshu/p/5676822.html">初探PHP多进程</a></li>
+    <li>多进程（使用 redis 等缓存数据库来实现资源的共享），可参考我以前的一篇文章： <a href="../07/php_multi_process.html">初探PHP多进程</a></li>
     <li>消息记录数据库持久化（log 日志还是不方便分析）</li>
     <li>...</li>
 </ul>

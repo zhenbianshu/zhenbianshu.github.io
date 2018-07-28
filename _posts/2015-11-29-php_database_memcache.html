@@ -69,7 +69,7 @@ stats [options]                         //获取memcache[有关某一项]的详�
 <hr />
 <h1>PHP的memcache扩展及应用</h1>
 <p>在https://pecl.php.net/index.php搜索获取到所需的memcache扩展包。</p>
-<p>linux系统，直接挑选版本(推荐最新stable稳定版)下载，解压后在解压目录下用phpize工具产生configure文件，并用它安装，安装完成后在/php.ini中添加extension。具体可看我的博文<a href="http://www.cnblogs.com/zhenbianshu/p/5002189.html">linux下的PHP中的最后一节</a>。</p>
+<p>linux系统，直接挑选版本(推荐最新stable稳定版)下载，解压后在解压目录下用phpize工具产生configure文件，并用它安装，安装完成后在/php.ini中添加extension。具体可看我的博文<a href="./php_on_linux.html">linux下的PHP中的最后一节</a>。</p>
 <p>windows下要点击链接右边的&ldquo;windows logo DLL&rdquo;链接，并在新打开的页面中，按照版本、32位/64位、线程安全/非线程安全来选择自己所需要的扩展，具体选项可以在phpinfo();页面看到。下载完成后，将其放入phppath/ext/目录下，然后在php.ini中添加extension=php_memcacache.dll;重启服务器完成安装。</p>
 <p>在phpinfo()页面中看到memcache扩展后，说明安装成功，我们就可以在php脚本中使用关于memcache的类函数库了。</p>
 <p>在手册中我们可以找到许多关于php的memcache扩展的使用，以下是一个典型的memcache使用流程。</p>

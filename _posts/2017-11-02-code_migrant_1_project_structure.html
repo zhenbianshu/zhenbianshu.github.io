@@ -10,7 +10,7 @@ comments: true
 <p>这是一个有6、7年历史，多人经手的老系统，PHP 语言，分布在50台机器上运行。代码使用最简单的结构，没有使用任何完整框架，甚至有三四千行代码的文件，修改时最新的 IDE 都无法帮得上忙，发生问题时排查困难。特别是程序员在写代码时，想引用之前的方法找不到，自己定义新的方法又无处放，只好在已经很杂乱的文件上堆砌。</p>
 <p>由于此系统一直在运行中，甚至各机器日顶峰QPS有近1000，而且作为一个业务系统，之前甚至没有CR，里面遍布一些比较&ldquo;奇怪&rdquo;的逻辑和写法，看得人头皮发麻，迁移这个系统无异于给行驶的汽车换轮子。</p>
 <p>写跟此项目迁移相关的文章，不仅是为了分享经验，更是为了在迁移的步骤中能梳理一下思绪，尽量少踩坑，也顺便沉淀一下知识。</p>
-<p>文章经常被人爬，而且还不注明原地址，我在这里的更新和纠错没法同步，这里注明一下原文地址：http://www.cnblogs.com/zhenbianshu/p/7773930.html</p>
+<p>{{site.article.copyright}}</p>
 <hr />
 <h1 id="toc_1">问题</h1>
 <p>首先是定位问题，之前的代码有以下问题：</p>
@@ -37,7 +37,7 @@ comments: true
     <li>约束性：无规矩不成方圆，既然是规范，那么一定有其约束性。框架一般会对文件、方法、命名、类等进行约束。</li>
     <li>支撑结构：框架只是一个支撑结构，适用性广，它像一个货架，开发者把代码货物摆到对应的地方即可。</li>
 </ul>
-<p>为了深入了解框架的思想，我之前也写过一个自己的PHP框架：<a href="https://github.com/zhenbianshu/sqier-framwork">GitHub-zhenbianshu-Sqire_Framwork</a>，还有配套的博客三篇：<a href="http://www.cnblogs.com/zhenbianshu/p/5331165.html">搭建自己的PHP框架心得</a> 。</p>
+<p>为了深入了解框架的思想，我之前也写过一个自己的PHP框架：<a href="https://github.com/zhenbianshu/sqier-framwork">GitHub-zhenbianshu-Sqire_Framwork</a>，还有配套的博客三篇：<a href="../../2016/03/php_framwork_tips_1.html">搭建自己的PHP框架心得</a> 。</p>
 <p>框架只是实现了 MVC 的设计模式和 简单的路由，有对此感兴趣的同学可以 fork 下看一下。</p>
 <h3 id="toc_4">Yaf</h3>
 <p>Yaf 学 PHP 应该都有所了解，这里不过多介绍。 它作为用 C 编写的PHP扩展存在，效率自然不用多说，选用 Yaf 更多是因为它作为框架的&ldquo;<code>自由</code>&rdquo;。</p>

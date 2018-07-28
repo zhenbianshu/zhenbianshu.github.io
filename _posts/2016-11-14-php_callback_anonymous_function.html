@@ -103,7 +103,7 @@ return $result;</code></pre>
     }</code></pre>
 </div>
 <p>返回值多种，具体看$callback。</p>
-<p>可用此函数实现PHP的事件机制，其实并不高深，在判断条件达成，或程序执行到某一步后 call_user_func()就OK了。这个我在之前的博客中也有介绍到：<a href="http://www.cnblogs.com/zhenbianshu/p/5352643.html">搭建自己的PHP框架心得（二）</a></p>
+<p>可用此函数实现PHP的事件机制，其实并不高深，在判断条件达成，或程序执行到某一步后 call_user_func()就OK了。这个我在之前的博客中也有介绍到：<a href="../04/php_framwork_tips_2.html">搭建自己的PHP框架心得（二）</a></p>
 <hr />
 <h1 id="toc_14">总结</h1>
 <p>其实以上$callback不用单独定义并使用变量引用，使用上面说过的第四种函数定义方式，直接在函数内定义，使用&lsquo;完全&rsquo;匿名函数就行了。 如：</p>
