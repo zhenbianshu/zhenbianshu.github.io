@@ -7,7 +7,7 @@ comments: true
 
 ## 前言
 ---
-工作中，我们常见的请求模型都是"请求-应答"式，即一次请求中，服务给请求分配一个独立的线程，一块独立的内存空间，所有的操作都是独立的，包括资源和系统运算。我们也知道，在请求中处理一次系统 I/O 的消耗是非常大的，如果有非常多的请求都进行同一类 I/O 操作，那么是否可以将这些I/O操作都合并到一起，进行一次 I/O 操作，是否可以大大降低下游资源服务器的负担呢？
+工作中，我们常见的请求模型都是"请求-应答"式，即一次请求中，服务给请求分配一个独立的线程，一块独立的内存空间，所有的操作都是独立的，包括资源和系统运算。我们也知道，在请求中处理一次系统 I/O 的消耗是非常大的，如果有非常多的请求都进行同一类 I/O 操作，那么是否可以将这些 I/O 操作都合并到一起，进行一次 I/O 操作，是否可以大大降低下游资源服务器的负担呢？
 
 最近我工作之余的大部分时间都花在这个问题的探究上了，对比了几个现有类库，为了解决一个小问题把 hystrix javanica 的代码翻了一遍，也根据自己工作中遇到的业务需求实现了一个简单的合并类，收获还是挺大的。可能这个需求有点"偏门"，在网上搜索结果并不多，也没有综合一点的资料，索性自己总结分享一下，希望能帮到后来遇到这种问题的小伙伴。
 
@@ -17,7 +17,7 @@ comments: true
 ---
 
 #### hystrix
-开源的请求合并类库（知名的）好像也只有 Netflix 公司开源的 `[Hystrix](https://github.com/Netflix/Hystrix)` 了， hystrix 专注于保持 WEB 服务器在高并发条件下的系统稳定，我们常用它的熔断器(Circuit Breaker) 来实现服务的服务隔离和灾时降级，有了它，可以使整个系统不至于被某一个接口的高并发洪流冲塌，即使接口挂了也可以将服务降级，返回一个人性化的响应。请求合并作为一个保障下游服务稳定的利器，在 hystrix 内实现也并不意外。
+开源的请求合并类库（知名的）好像也只有 Netflix 公司开源的 [`Hystrix`](https://github.com/Netflix/Hystrix) 了， hystrix 专注于保持 WEB 服务器在高并发环境下的系统稳定，我们常用它的熔断器(Circuit Breaker) 来实现服务的服务隔离和灾时降级，有了它，可以使整个系统不至于被某一个接口的高并发洪流冲塌，即使接口挂了也可以将服务降级，返回一个人性化的响应。请求合并作为一个保障下游服务稳定的利器，在 hystrix 内实现也并不意外。
 
 我们在使用 hystrix 时，常用它的 javanica 模块，以注解的方式编写 hystrix 代码，使代码更简洁而且对业务代码侵入更低。所以在项目中我们一般至少需要引用 `hystrix-core` 和 `hystrix-javanica` 两个包。
 
@@ -29,7 +29,7 @@ comments: true
 ```
 
 #### collapser
-hystrix collapser 是 hystrix 内的请求合并器，它有自定义BatchMethod 和 注解两种实现方式，自定义BatchMethod 网上有各种教程，实现起来很复杂，需要手写大量代码，而注解方式只需要添加两行注解即可，但配置方式我在官方文档上也没找见，中文方面本文应该是独一份儿了。
+hystrix collapser 是 hystrix 内的请求合并器，它有自定义 BatchMethod 和 注解两种实现方式，自定义 BatchMethod 网上有各种教程，实现起来很复杂，需要手写大量代码，而注解方式只需要添加两行注解即可，但配置方式我在官方文档上也没找见，中文方面本文应该是独一份儿了。
 
 其实现需要注意的是：
 
@@ -108,7 +108,7 @@ hystrix collapser 的配置需要在 `@HystrixCollapser` 注解上使用，主�
 - 是一种 Collection，类似于 ArrayList 或 Queue，可以存重复元素且有顺序;
 - 在多线程环境中能安全地将里面的数据全取出来进行消费，而不用自己实现锁。
 
-java.util.concurrent 包内的 LinkedBlockingDeque 刚好符合要求，首先它实现了 BlockingDeque 接口，多线程环境下的存取操作是安全的；此外，它还提供 `drainTo(Collection<? super E> c, int maxElements)` 方法，可以将容器内 maxElements 个元素安全地取出来，放到 Collection c 中。
+java.util.concurrent 包内的 `LinkedBlockingDeque` 刚好符合要求，首先它实现了 BlockingDeque 接口，多线程环境下的存取操作是安全的；此外，它还提供 `drainTo(Collection<? super E> c, int maxElements)` 方法，可以将容器内 maxElements 个元素安全地取出来，放到 Collection c 中。
 
 #### 实现
 以下是具体的代码实现：
@@ -186,9 +186,9 @@ public class BatchCollapser<E> implements InitializingBean {
 ## ConcurrentHashMultiset
 ---
 #### 设计
-上面介绍的请求合并都是将多个请求一次发送，下游服务器处理时本质上还是多个请求，最好的请求合并是在内存中进行，将请求结果简单合并成一个发送给下游服务器。如我们经常会遇到的需求：元素分值累加或数据统计，我们就可以先在内存中将某一项的分值或数据累加起来，定时请求数据库保存。
+上面介绍的请求合并都是将多个请求一次发送，下游服务器处理时本质上还是多个请求，最好的请求合并是在内存中进行，将请求结果简单合并成一个发送给下游服务器。如我们经常会遇到的需求：元素分值累加或数据统计，就可以先在内存中将某一项的分值或数据累加起来，定时请求数据库保存。
 
-Guava 内就提供了这么一种数据结构： `ConcurrentHashMultiset`，它是一种 set 结构，不同于普通的 set 结构，它在存储相同元素时并不会覆盖原有元素，而是给已有元素的 count 值加1，而且它在添加和删除时并不加锁也能保证线程安全，具体实现是通过一个while(true) 循环尝试删除，直到删除够所需要的数量。
+Guava 内就提供了这么一种数据结构： `ConcurrentHashMultiset`，它不同于普通的 set 结构存储相同元素时直接覆盖原有元素，而是给每个元素保持一个计数 count, 插入重复时元素的 count 值加1。而且它在添加和删除时并不加锁也能保证线程安全，具体实现是通过一个 while(true) 循环尝试操作，直到操作够所需要的数量。
 
 ConcurrentHashMultiset 这种排重计数的特性，非常适合数据统计这种元素在短时间内重复率很高的场景，经过排重后的数量计算，可以大大降低下游服务器的压力，即使重复率不高，能用少量的内存空间换取系统可用性的提高，也是很划算的。
 
@@ -214,14 +214,12 @@ ConcurrentHashMultiset 这种排重计数的特性，非常适合数据统计这
 
 ## 小结
 ---
-至此，最近了解到的请求合并技术就这些了，最后总结一下各个技术适用的场景：
+最后总结一下各个技术适用的场景：
 
 - hystrix collapser: 需要每个请求的结果，并且不在意每个请求的 cost 会增加；
 - BatchCollapser: 不在意请求的结果，需要请求合并能在时间和数量两个维度上触发；
 - ConcurrentHashMultiset：请求重复率很高的统计类场景；
 
-另外，如果选择自己来实现的话，完全可以将 BatchCollapser 和 ConcurrentHashMultiset 结合一下，BatchCollapser 里使用 ConcurrentHashMultiset 作为容器，这样就可以结合两者的优势了。
-
-技术方案没有最好的，适合自己的才是最好的。
+另外，如果选择自己来实现的话，完全可以将 BatchCollapser 和 ConcurrentHashMultiset 结合一下，在BatchCollapser 里使用 ConcurrentHashMultiset 作为容器，这样就可以结合两者的优势了。
 
 {{ site.article.summary}}
