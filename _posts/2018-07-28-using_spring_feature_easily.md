@@ -40,7 +40,7 @@ spring 分为核心层和应用层两大块。
 
 ## ApplicationContext
 ---
-###功能
+### 功能
 
 我们看 ApplicationContext 的接口结构，它 实现了 `EnvironmentCapable, ListableBeanFactory, HierarchicalBeanFactory,MessageSource, ApplicationEventPublisher, ResourcePatternResolver` 等接口，文档上对这些有大略的介绍，通过子类对这些接口的实现，一个 ApplicationContext 会具有以下功能：
 
