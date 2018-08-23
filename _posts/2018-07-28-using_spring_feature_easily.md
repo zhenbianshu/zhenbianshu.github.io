@@ -82,4 +82,4 @@ ApplicationContext 作为 spring 的核心，spring 内部自然提供了一些�
 
 当然，加载完 Spring 的核心模块后，我们可以用来调试 Spring 框架的应用层功能，如前文说过的 AOP、JDBC 等。
 
-{{ site.article.summary }}}
+{{ site.article.summary }}
