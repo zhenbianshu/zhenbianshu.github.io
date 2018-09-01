@@ -10,7 +10,7 @@ comments: true
 <p>2、memcache存储的数据类型单一，只支持key-value型的数据，要存储复杂类型的数据，必然需要PHP脚本的大量逻辑操作。</p>
 <hr />
 <h1>redis基本介绍</h1>
-<p>redis也是一个内存非关系型数据库，它拥有memcache在数据存储上的全部优点，而且在memcache的基础上(memcache的介绍可以看我的上一篇博文：<a href="../11/php_database_memcache.html">PHP中的数据库二、memcache</a></p>
+<p>redis也是一个内存非关系型数据库，它拥有memcache在数据存储上的全部优点，而且在memcache的基础上(memcache的介绍可以看我的上一篇博文：<a href="/2015/11/php_database_memcache.html">PHP中的数据库二、memcache</a></p>
 <ul>
     <li>增加了数据持久性功能，redis用rdb和aof两种方式实现数据持久性，在服务器突然宕机时也能几乎保留已存的全部数据。</li>
     <li>增加了string(字符串)、set(集合)、sorted_set(有序集合）、hash(哈希)、list(链表)数据类型，方便了多类型的存储和数据库操作。</li>
@@ -149,7 +149,7 @@ sentinel failover-timeout mymaster 900000        //在90000秒内哨兵不再试
 </code></pre>
 <hr />
 <h1>PHP操作redis服务器</h1>
-<p>安装好php的redis扩展后(具体看我的博文<a href="../11/php_on_linux.html">linux下的PHP</a>)，就可以直接使用redis的类函数库了。</p>
+<p>安装好php的redis扩展后(具体看我的博文<a href="/2015/11/php_on_linux.html">linux下的PHP</a>)，就可以直接使用redis的类函数库了。</p>
 <p>如下是典型的redis应用。</p>
 <pre><code>$redis=new Redis();                     //实例化一个Redis对象
 $redis-&gt;connect('host',port);           //连接redis服务器
