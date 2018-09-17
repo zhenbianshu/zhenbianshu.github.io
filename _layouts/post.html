@@ -44,25 +44,10 @@
                     Post</a>
                 {% endif %}
             </div>
-            <div id="gitmentContainer"></div>
-            <link rel="stylesheet" href="https://imsun.github.io/gitment/style/default.css">
-            <script src="https://imsun.github.io/gitment/dist/gitment.browser.js"></script>
-            <script>
-                var gitment = new Gitment({
-                    owner: 'zhenbianshu',
-                    repo: 'zhenbianshu.github.io',
-                    oauth: {
-                        client_id: 'bfccdd9dc776a23fd54a',
-                        client_secret: '5b1e19dcd32303801a8a817a8e3c6a5ac368b238',
-                    },
-                });
-                gitment.render('gitmentContainer');
-            </script>
         </div>
     </div>
 
-
 </div>
 
-
+{% include disqus-comments.html %}
 {% include footer.html %}
