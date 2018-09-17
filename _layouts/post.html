@@ -6,55 +6,63 @@
             {% include sidebar.html %}
         </div>
         <div class="col-md-9">
-          <div class="article">
-            <div class="well">
-                <h1><a href="{{ site.baseurl}}{{ page.url }}">{{ page.date | date: "%b %-d, %Y" }} - {{ page.title }}</a></h1>
-            {% if site.comments and page.comments %}
-                {% if site.disqus != '' %}
-                <p class="author"><a href="#disqus_thread" data-disqus-identifier="{{ page.url | slugify }}">Comments</a></p>
-                {% elsif site.isso != '' %}
-                <p class="author"><a href="{{ site.baseurl }}{{ page.url }}{{ site.isso_suffix }}#isso-thread">Comments</a></p>
-                {% endif %}
-            {% endif %}
-            <div class="post-content">
-            {{ content }}
+            <div class="article">
+                <div class="well">
+                    <h1><a href="{{ site.baseurl}}{{ page.url }}">{{ page.date | date: "%b %-d, %Y" }} - {{ page.title
+                        }}</a></h1>
+                    {% if site.comments and page.comments %}
+                    {% if site.disqus != '' %}
+                    <p class="author"><a href="#disqus_thread" data-disqus-identifier="{{ page.url | slugify }}">Comments</a>
+                    </p>
+                    {% elsif site.isso != '' %}
+                    <p class="author"><a href="{{ site.baseurl }}{{ page.url }}{{ site.isso_suffix }}#isso-thread">Comments</a>
+                    </p>
+                    {% endif %}
+                    {% endif %}
+                    <div class="post-content">
+                        {{ content }}
+                    </div>
+                    {% if page.comments %}
+                    {% if site.disqus != '' %}
+                    <div id="disqus_thread">
+                        <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments
+                            powered by Disqus.</a></noscript>
+                        <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+                    </div>
+                    {% elsif site.isso != '' %}
+                    <section id="isso-thread"></section>
+                    {% endif %}
+                    {% endif %}
+                </div>
             </div>
-            {% if page.comments %}
-                {% if site.disqus != '' %}
-            <div id="disqus_thread">
-                <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
-                <a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
-            </div>
-                {% elsif site.isso != '' %}
-                <section id="isso-thread"></section>
-                {% endif %}
-            {% endif %}
-            </div>
-          </div>
-          <div class="pagination">
-              {% if page.next %}
+            <div class="pagination">
+                {% if page.next %}
                 <a class="btn btn-default" href="{{ site.baseurl}}{{ page.next.url }}" class="next">Newer Post</a>
-              {% endif %}
-              {% if page.previous %}
-                <a class="btn btn-default" href="{{ site.baseurl}}{{ page.previous.url }}" class="previous">Older Post</a>
-              {% endif %}
-          </div>
+                {% endif %}
+                {% if page.previous %}
+                <a class="btn btn-default" href="{{ site.baseurl}}{{ page.previous.url }}" class="previous">Older
+                    Post</a>
+                {% endif %}
+            </div>
+            <div id="gitmentContainer"></div>
+            <link rel="stylesheet" href="https://imsun.github.io/gitment/style/default.css">
+            <script src="https://imsun.github.io/gitment/dist/gitment.browser.js"></script>
+            <script>
+                var gitment = new Gitment({
+                    owner: 'zhenbianshu',
+                    repo: 'zhenbianshu.github.io',
+                    oauth: {
+                        client_id: 'bfccdd9dc776a23fd54a',
+                        client_secret: '5b1e19dcd32303801a8a817a8e3c6a5ac368b238',
+                    },
+                });
+                gitment.render('gitmentContainer');
+            </script>
         </div>
     </div>
+
+
 </div>
 
-<div id="gitmentContainer"></div>
-<link rel="stylesheet" href="https://imsun.github.io/gitment/style/default.css">
-<script src="https://imsun.github.io/gitment/dist/gitment.browser.js"></script>
-<script>
-    var gitment = new Gitment({
-        owner: 'zhenbianshu',
-        repo: 'zhenbianshu.github.io',
-        oauth: {
-            client_id: 'bfccdd9dc776a23fd54a',
-            client_secret: '5b1e19dcd32303801a8a817a8e3c6a5ac368b238',
-        },
-    });
-    gitment.render('gitmentContainer');
-</script>
+
 {% include footer.html %}
