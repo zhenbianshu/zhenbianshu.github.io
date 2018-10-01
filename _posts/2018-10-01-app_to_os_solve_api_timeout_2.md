@@ -5,7 +5,7 @@ date: 2018-10-01 13:00:06 +0800
 comments: true
 ---
 
-## 上文
+## 应用复现
 ---
 接着上文 <a href="/2018/09/app_to_os_solve_api_timeout_1.html"> 从应用到操作系统查接口超时（上）</a> 继续排查导致接口超时的原因。
 
@@ -40,7 +40,7 @@ public class LoggerRunner {
 ---
 strace 命令很早就使用过，不久前还用它分析过 shell 脚本执行慢的问题( <a href="/2018/09/avoid_expanding_problems.html">解决问题，别扩展问题</a>)，但我还是不太习惯把 Java 和它联系起来，幸好有部门的老司机指点，于是就使用 strace 分析了一波 Java 应用。
 
-命令跟分析普通脚本一样， `strace -T -ttt -f -o strace.log java -jar log.jar`， -T 选项可以将每一个系统调用的耗时打印到系统调用的结尾。
+命令跟分析普通脚本一样， `strace -T -ttt -f -o strace.log java -jar log.jar`， -T 选项可以将每一个系统调用的耗时打印到系统调用的结尾。当然排查时使用 -p pid 附加到 tomcat 上也是可以的，虽然会有很多容易混淆的系统调用。
 
 对比 jmh 压测用例输出的 log4j2.info() 方法耗时，发现了下图中的状况。
 
