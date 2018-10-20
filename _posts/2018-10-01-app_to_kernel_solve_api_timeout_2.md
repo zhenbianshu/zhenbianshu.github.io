@@ -104,7 +104,7 @@ ext4 格式的文件系统在挂载时可以选择 (jouranling、ordered、write
 
 当然，我们也可以选择直接禁用 journal，使用 `tune2fs -O ^has_journal /dev/disk`，只能操作未被挂载的磁盘。
 
-由于 pdflush 进程向磁盘刷入数据会触发 journal 事务，导致 write 被阻塞，所以解决 journal 问题就可以解决接口超时问题。
+猜测因为 journal 触发了脏页落盘，而脏页落盘导致 write 被阻塞，所以解决 journal 问题就可以解决接口超时问题。
 
 ## 解决方案与压测结果
 ---
