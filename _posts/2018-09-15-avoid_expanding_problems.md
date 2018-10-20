@@ -94,7 +94,7 @@ done
 
 使用 `sort -k 5 start.log >> start_sorted.log` 将日志排下序，再写脚本处理。
 
-```
+```sh
 #!/bin/bash
 
 function get_acc_time() {
@@ -135,7 +135,7 @@ done < $start_file
 这次我以为是 awk 执行得很慢，于是我想使用新的策略来替代 awk，这时我想到将日志全量加载到内存中处理。
 于是我又写出了新的脚本：
 
-```
+```sh
 #!/bin/bash
 function get_time() {
         date_str=$1" "`echo $2 | cut -d '.' -f1`
@@ -182,7 +182,7 @@ done
 
 如果不把日志分开，而是存在同一个文件的话，根据 unique_id 排序的话，两个请求的日志一定是在一起的。再用 paste 命令稍做处理，将相邻的两条日志合并成一行，再使用循环读就行了，命令很简单： `cat start.log end.log | sort -k 5 | paste - - cost.log`，文件生成后，再写脚本来处理。
 
-```
+```sh
 #!/bin/bash
 function get_time() {
     date_str=$1" "`echo $2 | cut -d '.' -f1`
@@ -223,7 +223,8 @@ done < $start_file
 
 为了验证我的猜测，我把脚本简写后，使用 `time` 命令统计了耗时分布。
 
-```
+```sh
+#!/bin/bash
 while read -r start_line
 do
 	str=`echo "hello"`
