@@ -1,13 +1,13 @@
 ---
 layout: post
-title: "从应用到操作系统查接口超时（下）"
+title: "从应用到内核查接口超时（中）"
 date: 2018-10-01 13:00:06 +0800
 comments: true
 ---
 
 ## 应用复现
 ---
-接着上文 <a href="/2018/09/app_to_os_solve_api_timeout_1.html"> 从应用到操作系统查接口超时（上）</a> 继续排查导致接口超时的原因。
+接着上文 <a href="/2018/09/app_to_kernel_solve_api_timeout_1.html"> 从应用到内核查接口超时（上）</a> 继续排查导致接口超时的原因。
 
 {{site.article.copyright}}
 

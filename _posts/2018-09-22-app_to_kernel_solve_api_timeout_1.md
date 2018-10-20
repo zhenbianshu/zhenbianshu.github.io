@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "从应用到操作系统查接口超时（上）"
+title: "从应用到内核查接口超时（上）"
 date: 2018-09-22 17:00:06 +0800
 comments: true
 ---
