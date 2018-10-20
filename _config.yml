@@ -23,5 +23,5 @@ exclude: ['README.md']
 
 # 文章相关配置
 article:
-  copyright: 转载随意，请注明来源地址：https://zhenbianshu.github.io
+  copyright: 转载随意，请注明来源地址：https://zhenbianshu.github.io，文章持续修订。
   summary: 关于本文有什么疑问可以在下面留言交流，如果您觉得本文对您有帮助，欢迎关注我的 <a href="https://weibo.com/u/5715965217">微博</a> 或  <a href="https://github.com/zhenbianshu/">GitHub</a> 。
