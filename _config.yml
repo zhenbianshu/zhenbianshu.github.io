@@ -12,7 +12,7 @@ comments: true
 disqus: 'zhenbianshu'
 
 permalink: /:year/:month/:title.html
-paginate: 3
+paginate: 10
 
 highlighter: rouge
 markdown: kramdown
