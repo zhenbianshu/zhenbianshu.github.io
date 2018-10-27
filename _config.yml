@@ -20,6 +20,10 @@ gems: ['jekyll-paginate']
 
 exclude: ['README.md']
 
+collections:
+  stories:
+    output: true
+    permalink: /:year/:month/:title.html
 
 # 文章相关配置
 article:

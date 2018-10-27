@@ -1,7 +1,6 @@
 ---
 layout: post
 title: "处理好工作和学习"
-category: story
 date: 2018-06-29 20:00:06 +0800
 comments: true
 ---
