@@ -88,7 +88,7 @@ JVM TI 的 agent 使用很简单，在启动 agent 时添加 -agent 参数指定
 
 此外，还需要配置 `MANIFEST.MF` 文件的一些参数，允许我们重新定义类。如果你的 agent 实现还需要引用一些其他类库时，还需要将这些类库都打包到此 jar 包中，下面是我的 pom 文件配置。
 
-```
+```java
     <build>
         <plugins>
             <plugin>
@@ -121,7 +121,7 @@ JVM TI 的 agent 使用很简单，在启动 agent 时添加 -agent 参数指定
 #### 被修改的类
 TransformTarget 是要被修改的目标类，正常执行时，它会三秒输出一次 "hello"。
 
-```
+```java
 public class TransformTarget {
     public static void main(String[] args) {
         while (true) {
@@ -144,7 +144,7 @@ public class TransformTarget {
 Agent 是执行修改类的主体，它使用 ASM 修改 TransformTarget 类的方法，并使用 instrument 包将修改提交给 JVM。
 
 入口类，也是代理的 Agent-Class。
-```
+```java
 public class TestAgent {
     public static void agentmain(String args, Instrumentation inst) {
         inst.addTransformer(new TestTransformer(), true);
@@ -159,7 +159,7 @@ public class TestAgent {
 ```
 
 执行字节码修改和转换的类。
-```
+```java
 public class TestTransformer implements ClassFileTransformer {
 
     public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
@@ -202,7 +202,7 @@ public class TestTransformer implements ClassFileTransformer {
 ```
 #### Attacher
 使用 tools.jar 里方法将 agent 动态加载到目标 JVM 的类。
-```
+```java
 public class Attacher {
     public static void main(String[] args) throws AttachNotSupportedException, IOException, AgentLoadException, AgentInitializationException {
 
@@ -220,7 +220,7 @@ public class Attacher {
 ---
 掌握了字节码的动态修改技术后，再回头看 Btrace 的原理就更清晰了，稍微摸索一下我们也可以实现一个简版的。另外很多大牛实现的各种 Java 性能分析工具的技术栈也不外如此，了解了这些，未来我们也可以写出适合自己的工具，至少能对别人的工具进行修改~
 
-不得不说 Java 的生态真的非常繁荣，当真是博大精神，查阅一个模块的资料时能总引出一大堆新的概念，永远有学不完的新东西。
+不得不说 Java 的生态真的非常繁荣，当真是博大精深，查阅一个模块的资料时能总引出一大堆新的概念，永远有学不完的新东西。
 
 {{site.article.summary}}
 
