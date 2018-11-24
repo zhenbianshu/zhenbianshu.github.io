@@ -2,7 +2,7 @@
 layout: post
 title: "JVM 代码谁做主？"
 category: blog
-tags: [java, asm, bytecode, debug, JVM TI]
+tags: [Java, asm, bytecode, debug, JVM TI]
 date: 2018-11-10 13:00:06 +0800
 comments: true
 ---
