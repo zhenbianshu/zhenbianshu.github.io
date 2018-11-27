@@ -9,7 +9,6 @@ gaaccount: 'UA-129889454-1'
 
 # 评论
 comments: true
-disqus: 'zhenbianshu'
 
 permalink: /:year/:month/:title.html
 paginate: 10
