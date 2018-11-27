@@ -5,7 +5,7 @@ baseurl: ''
 github: 'zhenbianshu'
 
 # Set this to your UA-# value, or '' to disable the block completely
-gaaccount: ''
+gaaccount: 'UA-129889454-1'
 
 # 评论
 comments: true
