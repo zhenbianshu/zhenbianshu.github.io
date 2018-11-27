@@ -15,7 +15,7 @@ paginate: 10
 
 highlighter: rouge
 markdown: kramdown
-gems: ['jekyll-paginate']
+plugins: ['jekyll-paginate']
 
 exclude: ['README.md']
 
