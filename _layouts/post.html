@@ -17,7 +17,15 @@
                     </div>
                 </div>
                 {% if site.comments %}
-                {% include comments.html %}
+                    {% if article.comments %}
+                        {% include comments.html %}
+                    {% else %}
+                        <hr>
+                        comments forbidden.
+                    {% endif %}
+                {% else %}
+                    <hr>
+                    comments forbidden.
                 {% endif %}
             </div>
             <div class="pagination">
