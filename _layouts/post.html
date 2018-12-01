@@ -15,10 +15,10 @@
                     <div class="post-content">
                         {{ content }}
                     </div>
-                    {% if site.comments %}
-                    {% include comments.html %}
-                    {% endif %}
                 </div>
+                {% if site.comments %}
+                {% include comments.html %}
+                {% endif %}
             </div>
             <div class="pagination">
                 {% if page.next %}

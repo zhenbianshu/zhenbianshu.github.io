@@ -64,3 +64,8 @@ h2 {
     margin-bottom: -15px !important;
     margin-top: 25px !important;
 }
+
+.utterances {
+    max-width: none;
+    border-top: solid 1px gray;
+}
