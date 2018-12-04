@@ -10,6 +10,9 @@ gaaccount: 'UA-129889454-1'
 # 评论
 comments: true
 
+# 喝茶
+reward: true
+
 permalink: /:year/:month/:title.html
 paginate: 10
 

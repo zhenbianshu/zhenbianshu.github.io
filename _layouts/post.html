@@ -15,6 +15,9 @@
                     <div class="post-content">
                         {{ content }}
                     </div>
+                    {% if site.reward %}
+                        {% include reward.html %}
+                    {% endif %}
                 </div>
                 {% if site.comments %}
                     {% if page.comments %}
