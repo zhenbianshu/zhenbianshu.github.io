@@ -11,7 +11,7 @@ gaaccount: 'UA-129889454-1'
 comments: true
 
 # 喝茶
-reward: true
+reward: false
 
 permalink: /:year/:month/:title.html
 paginate: 10
