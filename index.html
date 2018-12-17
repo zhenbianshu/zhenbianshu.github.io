@@ -6,13 +6,7 @@ layout: default
 <div class="article">
     <div class="well">
         <h1><a href="{{ site.baseurl}}{{ post.url }}">{{ post.date | date: "%b %-d, %Y" }} - {{ post.title }}</a></h1>
-        {% if site.comments and post.comments %}
-            {% if site.disqus != '' %}
-        <p class="author"><span>{{ post.content | strip_html | strip_newlines | split: "" | size }} Word Count | </span><a href="{{ site.baseurl }}{{ post.url }}/#disqus_thread" data-disqus-identifier="{{ post.url | slugify }}">Comments</a></p>
-            {% elsif site.isso != '' %}
-            <p class="author"><span>{{ post.content | strip_html | strip_newlines | split: "" | size }} Word Count | </span><a href="{{ site.baseurl }}{{ post.url }}{{ site.isso_suffix }}#isso-thread">Comments</a></p>
-            {% endif %}
-        {% endif %}
+        <p class="author"><span>{{ post.content | strip_html | strip_newlines | split: "" | size }} Word Count </span></p>
         <div class="content">
             {{ post.content | strip_html | truncate: 300 }}
         </div>
