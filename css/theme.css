@@ -65,6 +65,11 @@ h2 {
     margin-top: 25px !important;
 }
 
+blockquote{
+    font-size: 13px;
+    font-style: oblique;
+}
+
 .utterances {
     max-width: none;
     border-top: solid 1px gray;
