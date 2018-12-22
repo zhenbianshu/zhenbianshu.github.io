@@ -11,7 +11,7 @@ comments: true
 <hr />
 <h1 id="toc_2">shell脚本基础</h1>
 <p>在编写ssh自动登陆脚本之前，先说一下shell脚本的基础，此基础不是一些语法什么的，网上到处都是，这里总结了一下shell脚本的运行机制~</p>
-<h2 id="toc_3">shell脚本的运行方式</h2>
+<h4 id="toc_3">shell脚本的运行方式</h4>
 <p>首先要说一下shell的几种启动方式，正是踩了脚本启动的坑，才使用原来十分钟就搞定的脚本，花了两个小时才搞定。同时也使得我们运行shell，知其所以然。</p>
 <h5 id="toc_4">通过文件名执行</h5>
 <p>shell脚本可以直接通过文件名执行，需要注意的是文件需要执行权限。通过 <code>sudo chmod +x ./file_name.sh</code> 来给文件添加执行权限；</p>
@@ -19,7 +19,7 @@ comments: true
 <p>我们常用的 <code>sh file_name.sh</code> 就是指定了脚本解释器 <code>/bin/sh</code>来解释执行脚本；常见的脚本解释器还有：<code>/bin/bash</code>等，我们可以使用<code>ls -l /bin/*sh</code>命令来查看当前可用的脚本解释器；</p>
 <h5 id="toc_6">使用. ./file_name或source命令执行脚本</h5>
 <p>这种方式不会像前两种方式一样fork一个子进程去执行脚本，而是使用当前shell环境执行，用于 .bashrc或者.bash_profile被修改的时候，我们不必重启shell或者重新登录系统，就能使当前的更改生效。</p>
-<h2 id="toc_7">shebang</h2>
+<h4 id="toc_7">shebang</h4>
 <p>我们写一个shell脚本时，总是习惯在最前面加上一行 <code>#!/binbash</code>,它就是脚本的<code>shebang</code>,至于为什么叫这么个奇怪的名字，C语言和Unix的开发者丹尼斯&middot;里奇称它为<code>可能是类似于"hash-bang"的英国风描述性文字</code>；</p>
 <p>贴一段wiki上的解释:</p>
 <blockquote>

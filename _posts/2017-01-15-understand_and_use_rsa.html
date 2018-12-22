@@ -33,7 +33,7 @@ comments: true
 <p>X.509是目前最能用的证书标准， 证书由用户公共密钥和用户标识符组成。此外还包括版本号、证书序列号、CA标识符、签名算法标识、签发者名称、证书有效期等信息。这一标准的最新版本是X.509 v3，它定义了包含扩展信息的数字证书。该版数字证书提供了一个扩展信息字段，用来提供更多的灵活性及特殊应用环境下所需的信息传送。</p>
 <hr />
 <h1 id="toc_8">RSA加密标准</h1>
-<h2 id="toc_9">公钥加密标准</h2>
+<h3 id="toc_9">公钥加密标准</h3>
 <p>公钥加密标准（Public Key Cryptography Standards, PKCS），此系列标准的设计与发布皆由RSA信息安全公司所制定。包括证书申请、证书更新、证书作废表发布、扩展证书内容以及数字签名、数字信封的格式等方面的一系列相关协议。</p>
 <p>目前在使用的最高版本为 PKCS#12，这版本也是我工作中使用最多的版本，此外我还接触过 PKCS#7 版本，java多用 PKCS#8 版本，下面分别说一下。</p>
 <h4 id="toc_10">PKCS#7：</h4>
@@ -42,7 +42,7 @@ comments: true
 <p>描述私有密钥信息格式，该信息包括公开密钥算法的私有密钥以及可选的属性集等，Apache读取证书私钥的标准，在JAVA平台中使用。（接入一些支付公司中经常会提供此格式的密钥，有些印象）</p>
 <h4 id="toc_12">PKCS#12：</h4>
 <p>描述个人信息交换语法标准。描述了将用户公钥、私钥、证书和其他相关信息打包的语法。 含有私钥，同时可以有公钥，有口令保护 格式一般为 <code>.pfx</code>。 由于它可以加密码保护，打开时需要一串特殊密码，所以相对安全些。</p>
-<h2 id="toc_13">证书和密钥文件格式</h2>
+<h3 id="toc_13">证书和密钥文件格式</h3>
 <p>需要注意：证书文件格式与加密标准并没有严格的对应关系，证书文件格式是存储证书的方式不同，可能存储的内容也略有不同。而加密标准是使用证书文件进行加解密的方式不同。</p>
 <h4 id="toc_14">pem格式</h4>
 <p>最普通的证书格式，以<code>-----BEGIN CERTIFICATE-----</code> 开头，以<code>-----END CERTIFICATE-----</code>结尾；有些pem证书把私钥也放在了一个文件中，但是很多平台还是需求证书和私钥分开放在不同的文件中。 pem证书有以下特点：</p>
@@ -77,7 +77,7 @@ comments: true
 <p>对于密钥（单指公私钥）的保存，并不需要特殊的格式，直接将base64编码后的密钥作为字符串存入文档即可。</p>
 <hr />
 <h1 id="toc_19">RSA加密操作</h1>
-<h2 id="toc_20">密钥生成和使用</h2>
+<h3 id="toc_20">密钥生成和使用</h3>
 <div>
 <pre><code class="language-none">openssl genrsa -out rsa_private_key.pem 1024 // 生产一个1024位的私钥, 保存在 rsa_private_key.pem 文件里
 
@@ -89,7 +89,7 @@ openssl rsa -in rsa_private_key.pem -pubout -out pub.pem  // 通过私钥生产�
 eg: openssl speed rsa1024
     openssl speed des-ede3 </code></pre>
 </div>
-<h2 id="toc_21">格式转换</h2>
+<h3 id="toc_21">格式转换</h3>
 <h4 id="toc_22">从pfx文件中提取公私钥</h4>
 <div>
 <pre><code class="language-none">openssl pkcs12 -in source.pfx -nocerts -nodes -out key.key // 从pfx文件中获取到密匙对文件，有时会需要密码
@@ -121,7 +121,7 @@ openssl pkcs12 -export -in certificate.cer -inkey privateKey.key -out certificat
 PFX to PEM
 openssl pkcs12 -in certificate.pfx -out certificate.cer -nodes</code></pre>
 </div>
-<h2 id="toc_24">PHP中使用RSA</h2>
+<h3 id="toc_24">PHP中使用RSA</h3>
 <p>作为一个PHPer,当然还要提一下在 PHP 中如何使用 RSA 加密，所用工具依然是强大的openssl扩展：</p>
 <div>
 <pre><code class="language-none"># 从pfx文件中提取私钥和证书(需要传入密码 $password)：
