@@ -9,7 +9,7 @@ comments: true
 ---
 不久前在部门周会上分享了 Hystrix 源码解析之后，就无奈地背上了"专家包袱"，同事们都认为我对 Hystrix 很熟，我们接触 Hystrix 更多的还是工作中的使用和配置，所以很多人一遇到 Hystrix 的配置问题就会过来问我。为了不让他们失望，我把 Hystrix 的[配置文档](https://github.com/Netflix/Hystrix/wiki/Configuration) 仔细看了一遍，将有疑问的点通过翻源码、查官方 issue、自己实验的方式整理了一遍，这才对 Hystrix 的配置有了一定的了解。
 
-在了解这些配置项的过程中，我也发现了很多坑，平常我们使用中认为理所应当的值并不会让 Hystrix 如期望工作，没有经过斟酌就复制粘贴的配置会让 Hystrix 永远不会起作用。于是写下本文，希望能帮助小伙伴们掌握 Hystrix。如果想了解 Hystrix 的话，可以搭配我之前的分享 PPT：[Hystrix 源码解析](/2018/08/hystrix_code_design_share.html)
+在了解这些配置项的过程中，我也发现了很多坑，平常我们使用中认为理所应当的值并不会让 Hystrix 如期望工作，没有经过斟酌就复制粘贴的配置会让 Hystrix 永远不会起作用。于是写下本文，希望能帮助小伙伴们掌握 Hystrix。如果想了解 Hystrix 的话，可以搭配我之前的分享 PPT：[Hystrix 源码解析]({{ site.baseurl }}/2018/08/hystrix_code_design_share.html)
 
 {{site.article.copyright}}
 

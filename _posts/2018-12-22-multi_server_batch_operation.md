@@ -34,7 +34,7 @@ SSH 的原理跟 HTTPS 差不多，都是基于 TCP 和 非对称加密进行的
 当我们验证此公钥指纹是我们要登陆的服务器后，服务器的公钥会被添加到 `~/.ssh/known_hosts` 里，再登陆时，ssh 检测到是已认证服务器后就会跳过公钥验证阶段。
 
 #### 建连过程
-关于通信加密的概念，我在之前的文章也有所介绍，参见：[再谈加密-RSA非对称加密的理解和使用](2017/01/understand_and_use_rsa.html)。至于 SSH 协议的建连过程，则可以参阅：[Protocol Basics: Secure Shell Protocol ](https://www.cisco.com/c/en/us/about/press/internet-protocol-journal/back-issues/table-contents-46/124-ssh.html)。
+关于通信加密的概念，我在之前的文章也有所介绍，参见：[再谈加密-RSA非对称加密的理解和使用]({{ site.baseurl }}/2017/01/understand_and_use_rsa.html)。至于 SSH 协议的建连过程，则可以参阅：[Protocol Basics: Secure Shell Protocol ](https://www.cisco.com/c/en/us/about/press/internet-protocol-journal/back-issues/table-contents-46/124-ssh.html)。
 
 总结起来主要包括以下步骤：
 

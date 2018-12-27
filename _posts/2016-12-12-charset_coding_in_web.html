@@ -54,7 +54,7 @@ comments: true
         <p>想 json_encode 保持原中文不自动转为 Unicode 可以使用<code>json_encode($str, JSON_UNESCAPED_UNICODE)</code>;添加一个 option 常量。</p>
     </li>
     <li>
-        <p>PHP 中各种编码方式的转换可以看一下我的这篇博客：<a href="/2015/11/php_deal_chinese_char_with_mb_lib.html">PHP用mb_string函数库处理与windows相关中文字符</a></p>
+        <p>PHP 中各种编码方式的转换可以看一下我的这篇博客：<a href="{{ site.baseurl }}/2015/11/php_deal_chinese_char_with_mb_lib.html">PHP用mb_string函数库处理与windows相关中文字符</a></p>
     </li>
     <li>
         <p>乱码的产生就是因为对数据编码和解码的方式不同: windows中使用 ANSI 标准的 GBK 编码，数据库中使用 Unicode 的不同的编码方式存储，网页浏览器又以不同编码来解析，统一为 UTF-8 进行数据编码即可解决这类问题。</p>
