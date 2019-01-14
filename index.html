@@ -3,6 +3,9 @@ layout: default
 ---
 
 {% for post in paginator.posts %}
+    {% if post.hidden %}
+        {% continue %}
+    {% endif %}
 <div class="article">
     <div class="well">
         <h1><a href="{{ site.baseurl}}{{ post.url }}">{{ post.date | date: "%b %-d, %Y" }} - {{ post.title }}</a></h1>

@@ -5,7 +5,7 @@ title: "Archives"
 
 <div class="well">
 {%for post in site.posts %}
-    {% unless post.next %}
+    {% unless post.next or post.next.hidden %}
         <h1>{{ post.date | date: '%Y' }}</h1>
         <ul>
     {% else %}
@@ -17,6 +17,9 @@ title: "Archives"
             <ul>
         {% endif %}
     {% endunless %}
+    {% if post.hidden %}
+        {% continue %}
+    {% endif %}
     <li><a href="{{ site.baseurl}}{{ post.url }}">{{ post.date | date: "%b %-d" }} - {{ post.title }}</a></li>
 {% endfor %}
 </ul>
