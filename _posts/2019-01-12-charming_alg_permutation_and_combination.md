@@ -64,61 +64,14 @@ comments: true
 - 元素无序性，Set[A B] 和 Set[B A] 都会被表示成 Set[A B]。
 - 元素唯一性，被同时表示为 Set[A B] 的多个元素只会保留一个。
 
-#### 递归穷举
-
 可以注意得到，上面程序中 count 参数是写死的，如果需要取出 4 个元素的话就需要四层循环嵌套了，这时候只好使用递归来帮助穷举。
-
-最终的代码是这样：
-
-```java
-public class Exhaustion {
-    private static List<String> m = Arrays.asList("a", "b", "c", "d", "e");
-
-    public static void main(String[] args) {
-        int n = 5;
-
-        Set<Set<String>> combinationAll = new HashSet<>();
-        for (int c = 1; c <= n; c++) {
-            Set<Set<String>> duplicated = exhaustion(new HashSet<>(), c);
-            for (Set<String> set : duplicated) {
-                if (set.size() == c) {
-                    combinationAll.add(set);
-                }
-            }
-        }
-
-        System.out.println(combinationAll);
-    }
-
-    private static Set<Set<String>> exhaustion(Set<String> tempSet, int count) {
-        Set<Set<String>> result = new HashSet<>();
-
-        if (count == 1) {
-            Set<Set<String>> finalCollection = new HashSet<>();
-            for (String ele : m) {
-                Set<String> tempCollection = new HashSet<>(tempSet);
-                tempCollection.add(ele);
-                finalCollection.add(tempCollection);
-            }
-
-            return finalCollection;
-        }
-
-        count--;
-        for (int i = 1; i < m.size(); i++) {
-            Set<String> tempCollection = new HashSet<>(tempSet);
-            tempCollection.add(m.get(i));
-            result.addAll(exhaustion(tempCollection, count));
-        }
-
-        return result;
-    }
-}
-```
 
 ## 从排列到组合-递归分治
 ---
 穷举毕竟太过暴力，我们来通过分治思想来重新考虑一下这个问题：
+
+
+#### 分治思想
 由于组合内元素的不可重复性，每次从集合内取出一个元素后，集合内的可用元素就要少 1。
 
 还是从 5 个元素中取 3 个元素的示例：
@@ -129,6 +82,8 @@ public class Exhaustion {
 
 不管一共要取多少个元素，最终都会归结成只取 1 个。
 
+
+#### 代码实现
 而用代码实现如下：
 
 ```java
@@ -176,7 +131,10 @@ public class Combination {
 
 ## 位运算
 ---
+#### 思想
 
+
+#### 代码实现
 
 
 ## 小结
