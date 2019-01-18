@@ -6,6 +6,9 @@
     <h1>最近</h1>
     <ul>
         {% for post in site.posts limit:5 %}
+            {% if post.hidden %}
+                {% continue %}
+            {% endif %}
           <li><a href="{{ site.baseurl}}{{ post.url }}">{{ post.title }}</a></li>
         {% endfor %}
     </ul>
