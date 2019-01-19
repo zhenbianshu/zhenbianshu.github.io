@@ -5,7 +5,6 @@ category: blog
 tags: [combination, alg]
 date: 2019-01-12 14:00:06 +0800
 comments: true
-hidden: true
 ---
 
 ## 需求
@@ -67,7 +66,9 @@ hidden: true
 - 元素无序性，Set[A B] 和 Set[B A] 都会被表示成 Set[A B]。
 - 另外又由于元素唯一性，被同时表示为 Set[A B] 的多个集合只会保留一个，这样就可以帮助将全排列转为组合。
 
-可以注意得到，上面程序中 count 参数是写死的，如果需要取出 4 个元素的话就需要四层循环嵌套了，如果取的元素是可变的话，普通的编码方式就不适合了。
+可以注意得到，上面程序中 count 参数是写死的，如果需要取出 4 个元素的话就需要四层循环嵌套了，如果取的元素个取是可变的话，普通的编码方式就不适合了。
+
+注: 可变层数的循环可以用 `递归` 来实现。
 
 ## 从排列到组合-分治
 ---
@@ -84,21 +85,14 @@ hidden: true
 - 如果我们解决了这个问题，已经取完最后一次了产生了 M-N+1 种临时集合，再考虑从 M-N+2 个元素中取一个元素呢，又有 M-N+2 种可能。
 - 将这些可能聚合到一块，直到取到了 N 个元素，这个问题也就解决了。
 
-
-
-由于组合内元素的不可重复性，每次从集合内取出一个元素后，集合内的可用元素就要少 1。
-
 还是从 5 个元素中取 3 个元素的示例：
 
-- 第一次取，从 5 个元素中取 1 个元素，产生了 5 种只包含一个元素的集合，这时候我们只需要考虑怎么从剩下的四个元素中取到 2 个，此时的公式为 $$C?^3_5 = C^1_5 * C^2_4$$。
-- 第二次取，我们拿着这 5 种只有一个元素的集合，从各自剩余的 4 个元素中再取出 1 个元素，此时我们只需要考虑怎么从剩下的三个元素中再取一个，此时的公式为 $$C?^3_5 = C^1_5 * C^1_4 * C^1_3$$。
-- 第三次取，我们拿着这些包含两个元素的集合，从各自剩余的 3 个元素中再取出一个元素，即可获取到所有的组合。
-
-不管一共要取多少个元素，最终都会归结成只取 1 个。
-
+- 从 5 个元素中取 3 个元素是一个复杂问题，为了简化它，我们认为已经取出了一个元素，还要再从剩余的 4 个元素中取出 2 个，求解公式为：$$C^3_5 = C^1_5 * C^2_4$$。
+- 从 4 个元素中取出 2 个依旧不易解决，那我们再假设又取出了一个元素，接下来的问题是如何从 3 个元素中取一个，公式为 $$C^3_5 = C^1_5 * C^1_4 * C^1_3$$。
+- 从 3 个元素中取 1 个已经是个简单问题了，有三种可能，再向上追溯，与四取一、五取一的可能性做乘，从而解决这个问题。
 
 #### 代码实现
-而用代码实现如下：
+用代码实现如下：
 
 ```java
 public class Combination {
@@ -108,6 +102,7 @@ public class Combination {
         int n = 5;
 
         Set<Set<String>> combinationAll = new HashSet<>();
+        // 先将问题分解成 五取一、五取二... 等的全排列
         for (int c = 1; c <= n; c++) {
             combinationAll.addAll(combination(m, new ArrayList<>(), c));
         }
@@ -140,64 +135,70 @@ public class Combination {
     }
 }
 ```
+其实现就是递归，关于递归和分治，有兴趣可以看一下隐藏篇： <a href="{{ site.baseurl }}/2019/01/recursion_and_divide_conquer.html"> 递归和分治</a>。
+## 直击本质-位运算
+---
+从元素的全排列找全组合，比穷举略好，但还不是最好的方法，毕竟它"绕了一次道"。
 
-从形式上来看，跟上面的递归穷举差距不大，毕竟递归是分治思想的一种实现。
+很多算法都能通过位运算巧秒地解决，其优势主要有两点：一者位运算在计算机中执行效率超高，再者由于位运算语义简单，算法大多直指本质。
 
-#### 递归实现的可变嵌套层数
+组合算法也能通过位运算实现。
+#### 思想
+再次考虑全组合的需求，从 M 个元素中取任意个元素形成组合，组合内元素不能重复、元素位置无关。
+
+之前的方法都是从结果组合是否满足要求来考虑问题，考虑组合是否有重复元素、是否已有同样的组合等条件。如果换种思路，从待选元素上来考虑呢？
+
+对于每个元素来说，它的状态就简单得多了，要么被放进组合，要么不放进组合。每个元素都有这么两种状态。如果从 5 个元素中任意取 N 个元素形成组合的话，用二进制位来表示每个元素是否被放到组合里。
+
+```
+A  B  C  D  E
+0  0  0  0  1   [E] = 1
+
+A  B  C  D  E
+0  0  0  1  0   [D] = 2
+
+A  B  C  D  E
+0  0  0  1  1   [DE] = 3
+
+...
+```
+看到这里，应该就非常清楚了吧，每种组合都可以拆解为 N 个二进制位的表达形式，而每个二进制组合同时代表着一个十进制数字，所以每个十进制数字都就能代表着一种组合。
+
+十进制数字的数目我们很简单就能算出来，从`00000...` 到 `11111...` 一共有 $$2^n$$ 种，排除掉全都不被放进组合这种可能，结果有 $$2^n-1$$ 种。
+
+#### 代码实现
+下面是 Java 代码的实现：
 
 ```java
-public class Exhaustion {
-    private static List<String> m = Arrays.asList("a", "b", "c", "d", "e");
+public class Combination {
 
     public static void main(String[] args) {
-        int n = 5;
-
-        Set<Set<String>> combinationAll = new HashSet<>();
-        for (int c = 1; c <= n; c++) {
-            Set<Set<String>> duplicated = exhaustion(new HashSet<>(), c);
-            for (Set<String> set : duplicated) {
-                if (set.size() == c) {
-                    combinationAll.add(set);
-                }
-            }
-        }
-
+        String[] m = {"A", "B", "C", "D", "E"};
+        Set<Set<String>> combinationAll = combination(m);
         System.out.println(combinationAll);
+
     }
 
-    private static Set<Set<String>> exhaustion(Set<String> tempSet, int count) {
+    private static Set<Set<String>> combination(String[] m) {
         Set<Set<String>> result = new HashSet<>();
 
-        if (count == 1) {
-            Set<Set<String>> finalCollection = new HashSet<>();
-            for (String ele : m) {
-                Set<String> tempCollection = new HashSet<>(tempSet);
-                tempCollection.add(ele);
-                finalCollection.add(tempCollection);
+        for (int i = 1; i < Math.pow(2, m.length) - 1; i++) {
+            Set<String> eligibleCollections = new HashSet<>();
+            // 依次将数字 i 与 2^n 按位与，判断第 n 位是否为 1
+            for (int j = 0; j < m.length; j++) {
+                if ((i & (int) Math.pow(2, j)) == Math.pow(2, j)) {
+                    eligibleCollections.add(m[j]);
+                }
             }
-
-            return finalCollection;
+            result.add(eligibleCollections);
         }
-
-        count--;
-        for (int i = 1; i < m.size(); i++) {
-            Set<String> tempCollection = new HashSet<>(tempSet);
-            tempCollection.add(m.get(i));
-            result.addAll(exhaustion(tempCollection, count));
-        }
-
         return result;
     }
 }
 ```
 
-## 位运算
----
-#### 思想
-
-
-#### 代码实现
-
-
 ## 小结
 ---
+排列和组合算法在实际应用中很常见，而且他们的实现方法也非常具有参考意义。总的来说：排列用递归、组合用位运算。
+
+{{ site.article.summary }}
