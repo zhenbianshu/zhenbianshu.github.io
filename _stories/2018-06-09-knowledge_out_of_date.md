@@ -3,6 +3,7 @@ layout: post
 title: "学习什么知识不会过时"
 date: 2018-06-09 18:00:06 +0800
 comments: true
+category: thoughts
 ---
 
 ## 近况

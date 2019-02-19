@@ -3,6 +3,7 @@ layout: post
 title: "处理好工作和学习"
 date: 2018-06-29 20:00:06 +0800
 comments: true
+category: thoughts
 ---
 
 ## 答辩结束了

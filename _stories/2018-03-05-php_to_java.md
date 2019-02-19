@@ -3,6 +3,7 @@ layout: post
 title: "从PHP到Java"
 date: 2018-03-05 16:25:06 +0800
 comments: true
+category: experience
 ---
 最近主要编程语言从 PHP 转到了 Java。这一个多月的经历对我很有意义，所以写文章记录一下。
 

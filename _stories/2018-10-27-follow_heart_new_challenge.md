@@ -3,6 +3,7 @@ layout: post
 title: "顺从内心，追求挑战"
 date: 2018-10-27 10:00:06 +0800
 comments: true
+category: thoughts
 ---
 ## 近况
 ---
