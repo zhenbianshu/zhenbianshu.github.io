@@ -7,6 +7,9 @@ title: "Story"
     <h1>思考</h1>
     <ul>
     {%for post in site.stories %}
+        {% if post.hidden %}
+            {% continue %}
+        {% endif %}
         <li><a href="{{ site.baseurl}}{{ post.url }}">{{ post.date | date: "%b %-d" }} - {{ post.title }}</a></li>
     {% endfor %}
     </ul>
