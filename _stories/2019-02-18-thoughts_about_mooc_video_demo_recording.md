@@ -3,7 +3,6 @@ layout: post
 title: "教学视频 Demo 录制有感"
 date: 2019-02-18 21:00:06 +0800
 comments: true
-hidden: true
 category: experience
 ---
 ## 由来
