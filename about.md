@@ -3,10 +3,12 @@ layout: default
 title: "About"
 ---
 
-## About me
+## Experience
 ---
-软件开发工程师，目前就职于微博，在做视频相关的工作。
-
+- 2012.09 - 2016.07 SXAU.CS.bachelor
+- 2016.03 - 2017.04 Beebank.Pay.Developer
+- 2017.04 - 2018.01 Weibo.LBS.Developer
+- 2018.01 -     Weibo.Video.Developer
 
 ## Contact
 ---
