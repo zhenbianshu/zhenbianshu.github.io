@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "JVM 代码谁做主？"
+title: "Java 动态字节码技术"
 category: blog
 tags: [Java, asm, bytecode, debug, JVM TI]
 date: 2018-11-10 13:00:06 +0800
