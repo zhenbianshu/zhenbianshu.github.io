@@ -124,7 +124,7 @@ public class WinterServlet implements Servlet {
 
 下图展示了 Tomcat 中各级别容器的关系：
 
-<img src="/images/2019/tomcat_container.png">
+<img src="/images/2019/tomcat_container.jpg">
 
 - `Engine` 容器是最顶级的容器，可以理解为总控中心，在 Nginx 中就相当于 `nginx.conf` 文件中的配置。
 - `Host` 容器对应一个虚拟主机，管理一个主机的信息和其子容器，相当于 Nginx 中的一个 `vhosts` 配置。
