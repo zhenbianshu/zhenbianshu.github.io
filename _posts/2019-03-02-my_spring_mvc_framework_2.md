@@ -16,7 +16,7 @@ hidden: true
 
 当然了，开始阶段只有一个入口类，项目也只依赖框架，一个普通 Main 入口类即可。
 
-{{ site.article.copyright }
+{{ site.article.copyright }}
 
 ## Servlet 和容器
 ---
@@ -171,4 +171,4 @@ public class WinterServlet implements Servlet {
 
 Tomcat 容器的相关知识可以不必去纠结，毕竟太过于专有，但像 Servlet 和 Spring DispatcherServlet 这样的设计还是非常值得我们去研究和参考的。
 
-{{ site.article.summary }
+{{ site.article.summary }}
