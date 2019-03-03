@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "写自己的 Spring-Boot（二）：容器"
+title: "写自己的 Spring-Boot（二）：Servlet 容器"
 category: blog
 tags: [Spring, framework, Java]
 date: 2019-03-02 08:00:06 +0800
@@ -15,6 +15,8 @@ hidden: true
 实现过程呢，就顺从敏捷开发思想的引导，首先使框架能 Run 起来，再通过快速迭代、小步快跑地优化。框架是没法独立运行起来的，还需要搭配上工程实现业务逻辑才行。所以，我们向项目内添加一个同级模块使用 winter 框架，这也算是 TDD 测试驱动开发的另一种表现形式了。
 
 当然了，开始阶段只有一个入口类，项目也只依赖框架，一个普通 Main 入口类即可。
+
+{{ site.article.copyright }
 
 ## Servlet 和容器
 ---
@@ -58,7 +60,6 @@ public interface Servlet {
 那么一个 HTTP 请求从发到操作系统到被 Java 程序处理后再响应的整个流程如图（实线是请求，虚线是响应）：
 
 <img src="/images/2019/servlet.png">
-
 
 收到操作系统的 CGI 请求后，由服务器将这些 CGI 请求包装成 `ServletRequest` 后分派给 Java 程序处理后，Java 程序将响应结果写入 `ServletRequest` 传回给服务器， 服务器再将响应解析为 CGI 响应给操作系统，再由操作系统将结果通过网络连接响应给客户端。
 
@@ -118,91 +119,56 @@ public class WinterServlet implements Servlet {
 
 ## 连接服务器
 ----
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#### Tomcat 容器
+在 Tomcat 容器中，servlet 并不是直接依附 Tomcat 而生的，Tomcat 中将容器分为四个级别，将容器的职责进行了解耦。
+
+下图展示了 Tomcat 中各级别容器的关系：
+
+<img src="/images/2019/tomcat_container.png">
+
+- `Engine` 容器是最顶级的容器，可以理解为总控中心，在 Nginx 中就相当于 `nginx.conf` 文件中的配置。
+- `Host` 容器对应一个虚拟主机，管理一个主机的信息和其子容器，相当于 Nginx 中的一个 `vhosts` 配置。
+- `Context` 容器是最接近 servlet 的容器了，我们通过 context 可以设置一些资源属性和管理组件，Nginx 中好像并不到合适的对应，牵强一点的话就是一些 日志和静态文件配置吧。
+- `Wrapper` 容器是对一个 servlet 的封装，负责 servlet 的加载、初始化、执行和销毁。
+
+#### 实现
+我们在之前声明的 WinterServlet 和 Tomcat 之间建立联系。
+
+```java
+   public void startTomcat() {
+        // 简单地初始化一个 Tomcat 服务器
+        tomcat = new Tomcat();
+        tomcat.setPort(6699);
+        tomcat.start();
+
+        // 实例化一个 Context 容器的默认实现
+        Context context = new StandardContext();
+        context.setPath("");
+        context.addLifecycleListener(new Tomcat.FixContextListener());
+
+        // 实例化我们创建的 WinterServlet 并将它添加到 Context 容器中
+        Servlet servlet = new WinterServlet();
+        Tomcat.addServlet(context, "winterServlet", servlet).setAsyncSupported(true);
+        context.addServletMappingDecoded("/*", "winterServlet"); // 注意其匹配的 URI 为所有
+
+        tomcat.getHost().addChild(context);
+
+        // 将 Tomcat 的运行包装成独立线程
+        Thread awaitThread = new Thread("container-tomcat") {
+            @Override
+            public void run() {
+                TomcatServer.this.tomcat.getServer().await();
+            }
+        };
+        awaitThread.setContextClassLoader(getClass().getClassLoader());
+        awaitThread.setDaemon(false);
+        awaitThread.start();
+```
+
+## 小结
+---
+这样，一个最基本的 WEB 框架就 OK 了，虽然启动后所有的请求都只会响应 "Hello World!"。
+
+Tomcat 容器的相关知识可以不必去纠结，毕竟太过于专有，但像 Servlet 和 Spring DispatcherServlet 这样的设计还是非常值得我们去研究和参考的。
+
+{{ site.article.summary }
