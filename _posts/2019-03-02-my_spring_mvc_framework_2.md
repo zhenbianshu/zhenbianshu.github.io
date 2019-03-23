@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "写自己的 Spring-Boot（二）：Servlet 容器"
+title: "Mini Spring-Boot（二）：Servlet 容器"
 category: blog
 tags: [Spring, framework, Java]
 date: 2019-03-02 08:00:06 +0800

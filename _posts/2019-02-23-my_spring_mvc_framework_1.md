@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "写自己的 Spring-Boot（一）：结构"
+title: "Mini Spring-Boot（一）：结构"
 category: blog
 tags: [Spring, framework, Java]
 date: 2019-02-23 08:00:06 +0800
