@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Mini Spring-Boot（四）：Bean"
+title: "Mini Spring-Boot（四）：Bean 管理"
 category: blog
 tags: [Spring, framework, Java]
 date: 2019-03-23 08:00:06 +0800

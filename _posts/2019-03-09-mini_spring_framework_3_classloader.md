@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Mini Spring-Boot（三）：资源"
+title: "Mini Spring-Boot（三）：资源加载"
 category: blog
 tags: [Spring, framework, Java]
 date: 2019-03-09 08:00:06 +0800
