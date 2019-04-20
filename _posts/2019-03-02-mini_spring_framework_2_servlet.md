@@ -1,11 +1,10 @@
 ---
 layout: post
-title: "Mini Spring-Boot（二）：Servlet 容器"
+title: "Mini Spring-Boot（二）Servlet 容器"
 category: blog
 tags: [Spring, framework, Java]
 date: 2019-03-02 08:00:06 +0800
 comments: true
-hidden: true
 ---
 
 ## 续言
@@ -15,6 +14,8 @@ hidden: true
 实现过程呢，就顺从敏捷开发思想的引导，首先使框架能 Run 起来，再通过快速迭代、小步快跑地优化。框架是没法独立运行起来的，还需要搭配上工程实现业务逻辑才行。所以，我们向项目内添加一个同级模块使用 winter 框架，这也算是 TDD 测试驱动开发的另一种表现形式了。
 
 当然了，开始阶段只有一个入口类，项目也只依赖框架，一个普通 Main 入口类即可。
+
+项目地址：[winter-zhenbianshu-Github](https://github.com/zhenbianshu/winter-framework)
 
 {{ site.article.copyright }}
 

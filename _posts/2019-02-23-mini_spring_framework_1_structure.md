@@ -1,11 +1,10 @@
 ---
 layout: post
-title: "Mini Spring-Boot（一）：结构"
+title: "Mini Spring-Boot（一）结构"
 category: blog
 tags: [Spring, framework, Java]
 date: 2019-02-23 08:00:06 +0800
 comments: true
-hidden: true
 ---
 
 ## 想法
@@ -27,6 +26,8 @@ hidden: true
 - 仿写完成后的成就感更能促进自己更有动力进行下去。
 
 所以，从这篇开始我会断断续续记录自己仿写 Spring 的过程，在分享的同时，也加深自己的理解。
+
+项目地址：[winter-zhenbianshu-Github](https://github.com/zhenbianshu/winter-framework)
 
 {{ site.article.copyright }}
 

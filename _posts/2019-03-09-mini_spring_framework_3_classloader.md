@@ -1,11 +1,10 @@
 ---
 layout: post
-title: "Mini Spring-Boot（三）：资源加载"
+title: "Mini Spring-Boot（三）资源加载"
 category: blog
 tags: [Spring, framework, Java]
 date: 2019-03-09 08:00:06 +0800
 comments: true
-hidden: true
 ---
 
 ## 续言
@@ -15,6 +14,8 @@ hidden: true
 我们不可能在 WinterServlet 里执行所有的业务逻辑，所以我们还要把统一到的所有请求再根据请求 URI 分发到对应的 Action 里。
 
 首先，我们要添加一些跟 Spring 类似的 `@Controller, @RequestMapping, @RequestParam` 等注解，并将其用在我们添加的测试代码中。将项目内注解为 @Controller 的类都找出来，我们只能进行遍历了，现在要解决的是如何能获取到项目内所有的类。
+
+项目地址：[winter-zhenbianshu-Github](https://github.com/zhenbianshu/winter-framework)
 
 {{ site.article.copyright }}
 
