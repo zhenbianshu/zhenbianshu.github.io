@@ -39,6 +39,20 @@ spring-boot 启动过程
 	获取 RunListener, 步骤类似于初始化器，但传入了 SpringApplication 对象和参数，将对象内的监听器注入到 runListener 内
 	向所有 listener 发送应用启动事件(日志应用、后台预初始化、代理应用、liquibase服务) （todo 各做了什么）
 	准备环境
+    	获取一个默认环境实例
+    	配置环境实例
+    		判断需要添加 ConversionService，获取 conversionService 实例
+    			创建并获取单例的公共实例 conversionService
+    				配置参数解析器
+    				配置默认的格式化器和转换器
+    		将获取到的 conversionSerivce 添加到环境中
+    		将命令行和默认属性配置到环境中
+    		将当前 profile 配置到环境中
+    	向所有监听器发送环境准备 ApplicationEnvironmentPreparedEvent 事件
+    	把环境绑定到 SpringApplication 应用实例上
+    	把标准环境转换为一个 可配置环境 ConfigurableEnvironment
+    	给环境添加配置属性源
+
 
 	配置忽略 bean
 
