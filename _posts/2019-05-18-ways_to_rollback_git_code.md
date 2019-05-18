@@ -21,7 +21,6 @@ comments: true
 
 ## 普通方式
 ---
-
 #### revert
 首先肯定的是 revert，`git revert commit_id` 能产生一个 与 commit_id 完全相反的提交，即 commit_id 里是添加， revert 提交里就是删除。
 
@@ -46,13 +45,15 @@ master> git push --force origin master
 
 另外，reset 毕竟太野蛮，我们还是想能保留提交历史，以后排查问题也可以参考。
 
-## Rebase
+## 升级方式
 ---
+#### rebase
 只好用搜索引擎继续搜索，看到有人提出可以先使用 `rebase` 把多个提交合并成一个提交，再使用 revert 产生一次反提交。
 
-## 文件操作
----
 
+#### 文件操作
+
+#### rebase 的正确姿势
 
 ## 小结
 ---
