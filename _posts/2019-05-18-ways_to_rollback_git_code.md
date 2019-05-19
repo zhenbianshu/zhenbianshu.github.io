@@ -19,7 +19,7 @@ comments: true
 
 {{ site.article.copyright }}
 
-## 普通方式
+## 基础试探
 ---
 #### revert
 首先肯定的是 revert，`git revert commit_id` 能产生一个 与 commit_id 完全相反的提交，即 commit_id 里是添加， revert 提交里就是删除。
@@ -45,17 +45,56 @@ master> git push --force origin master
 
 另外，reset 毕竟太野蛮，我们还是想能保留提交历史，以后排查问题也可以参考。
 
-## 升级方式
+## 升级融合
 ---
 #### rebase
-只好用搜索引擎继续搜索，看到有人提出可以先使用 `rebase` 把多个提交合并成一个提交，再使用 revert 产生一次反提交。
+只好用搜索引擎继续搜索，看到有人提出可以先使用 `rebase` 把多个提交合并成一个提交，再使用 revert 产生一次反提交，这种方法的思路非常清晰，把 revert 和 rebase 两个命令搭配得很好，相当于使用 revert 回退的升级版。
 
+先说一下 rebase，rebase 是"变基"的意思，这里的"基"，在我理解是指[多次] commit 形成的 git workflow，使用 rebase，我们可以改变这些历史提交，修改 commit 信息，将多个 commit 进行组合。
+
+介绍 rebase 的文档有很多，我们直接来说用它来进行代码回退的步骤。
+
+1. 首先，切出一个新分支 F，使用 git log 查询一下`要回退到`的 commit 版本 N。
+2. 使用命令 `git rebase -i N`， -i 指定交互模式后，会打开 git rebase 编辑界面，形如：
+
+    ```
+    pick 6fa5869 commit1
+    pick 0b84ee7 commit2
+    pick 986c6c8 commit3
+    pick 91a0dcc commit4
+    ```
+3. 这些 commit 自旧到新由上而下排列，我们只需要在 commit_id 前添加操作命令即可，在合并 commit 这个需求里，我们可以选择 `pick(p)` 最旧的 commit1，然后在后续的 commit_id 前添加 `squash(s)` 命令，将这些 commits 都合并到最旧的 commit1 上。
+4. 保存 rebase 结果后，再编辑 commit 信息，使这次 rebase 失效，git 会将之前的这些 commit 都删除，并将其更改合并为一个新的 commit5，如果出错了，也可以使用 `git rebase --abort/--continue/--edit-todo ` 对之前的编辑进行撤销、继续编辑。
+5. 这个时候，主分支上的提交记录是 `older, commit1, commit2, commit3, commit4`，而 F 分支上的提交记录是 `older, commit5`，由于 F 分支的祖先节点是 older，明显落后于主分支的 commit4，将 F 分支向主分支合并是不允许的，所以我们需要执行 `git merge master` 将主分支向 F 分支合并，合并后 git 会发现 commit1 到 commit4 提交的内容和 F 分支上 commit5 的修改内容是完全相同的，会自动进行合并，内容不变，但多了一个 commit5。
+6. 再在 F 分支上对 commit5 进行一次 revert 反提交，就实现了把 commit1 到 commit4 的提交全部回退。
+
+这种方法的取巧之处在于巧妙地利用了 rebase 操作历史提交的功能和 git 识别修改相同自动合并的特性，操作虽然复杂，但历史提交保留得还算完整。
+
+rebase 这种修改历史提交的功非常实用，能够很好地解决我们遇到的一个小功能提交了好多次才好使，而把 git 历史弄得乱七八糟的问题，只需要注意避免在多人同时开发的分支使用就行了。
+
+遗憾的是，当天我并没有理解到 rebase 的这种思想，又由于试了几个方法都不行太过于慌乱，在 rebase 完成后，向主分支合并被拒之后对这些方式的可行性产生了怀疑，又加上有同事提出听起来更可行的方式，就中断了操作。
 
 #### 文件操作
+这种更可行的方式就是对文件操作，然后让 git 来识别变更，具体是：
 
-#### rebase 的正确姿势
+1. 从主分支上切出一个跟主分支完全相同的分支 F。
+2. 从文件管理系统复制项目文件夹为 bak，在 bak 内使用 `git checkout N` 将代码切到想要的历史提交，这时候 git 会将 bak 内的文件恢复到 N 状态。
+3. 在从文件管理系统内，将 bak 文件夹下 `除了 .git` 文件夹下的所有内容复制粘贴到原项目目录下。git 会纯从文件级别识别到变更，然后更新工作区。
+4. 在原项目目录下执行 `add 和 commit`，完成反提交。
+
+这种方式的巧妙之处在于利用 git 本身对文件的识别，不牵涉到对 workflow 操作。
 
 ## 小结
 ---
+最后终于靠着文件操作方式成功完成了代码回退，事后想来真是一把心酸泪。
+
+为了让我的五个小时不白费，复盘一下当时的场景，学习并总结一下四种代码回退的方式：
+
+- revert 适合需要回退的历史提交不多，且无合并冲突的情景。
+- 如果你可以向 master 强推代码，且想让 git log 里不再出现被回退代码的痕迹，可以使用 `git reset --hard + git push --force ` 的方式。
+- 如果你有些 geek，追求用"正规而正统"的方式来回退代码，rebase + revert 满足你的需求。
+- 如果你不在乎是否优雅，想用最简单，最直接的方式，文件操作正合适。
+
+git 真的是非常牛逼的代码管理工具，入手简单，三五个命令组合起来就足够完成工作需求，又对 geek 们非常友好，你想要的骚操作它都支持，学无止境啊。
 
 {{ site.article.summary }}
