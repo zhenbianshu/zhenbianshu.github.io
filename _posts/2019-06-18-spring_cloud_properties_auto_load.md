@@ -13,7 +13,11 @@ comments: true
 {{ site.article.copyright }}
 
 
-需求：
+## 环境和属性 enviroment 和 property
+---
+
+## Bean 和属性 bean 和 @value
+---
 
 ## Spring Cloud 自动加载机制
 ---
@@ -22,11 +26,6 @@ comments: true
 ## 扩展
 ---
 修改 env
-
-
-## 环境与属性
----
-
 
 ## 小结
 ---
