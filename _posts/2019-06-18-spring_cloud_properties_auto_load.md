@@ -15,7 +15,7 @@ comments: true
 
 虽然在解决需求问题时走了些弯路，但也借此机会了解了 Spring Cloud 的一部分，抽空总结一下问题和在查询问题中了解到的知识，分享出来让再遇到此问题的同学少踩坑吧。
 
-本文基于 Spring 5.1 和 Spring Cloud 2.1。
+本文基于 Spring 5.0.5、Spring Boot 2.0.1 和 Spring Cloud 2.0.2。
 
 {{ site.article.copyright }}
 
@@ -156,9 +156,36 @@ private ConfigurationProperty findProperty(ConfigurationPropertyName name,
 2. 添加一个 BeanPostProcessor，手动实现对 Bean 属性的修改。实现起来很复杂，而且由于每一个 BeanPostProcessor 在所有 Bean 创建时都会调用，可能会有安全问题。
 3. 添加属性解析器 PropertyResolver 或类型转换器 ConversionService。它们都只负责处理一个属性，由于我们的目标是"多个"属性变成一个属性，它们也无能为力。
 
+我这里能想到的方式是借用 Spring 自动注入的能力，如果我们把 Environment Bean 注入到某个类中，然后在类的初始化方法里对 Environment 内的 PropertySource 里进行修改，也可以达成目的，这里贴一下伪代码。
 
+```java
+@Component
+@RefreshScope  // 借用 Spring Cloud 实现此 Bean 的刷新
+public class ListSupportPropertyResolver {
+    @Autowired
+    ConfigurableEnvironment env; // 将环境注入到 Bean 内是修改环境的重要前提
+
+    @PostConstruct
+    public void init() {
+        // 将属性键值对从环境内取出
+        Map<String, Object> properties = extract(env.getPropertySources());
+
+        // 解析环境里的数组，抽取出其中的数组配置
+        Map<String, List<String>> listProperties = collectListProperties(properties)
+        Map<String, Object> propertiesMap = new HashMap<>(listProperties);
+
+        MutablePropertySources propertySources = env.getPropertySources();
+        // 把数组配置生成一个 PropertySource 并放到环境的 PropertySourceList 内
+        propertySources.addFirst(new MapPropertySource("modifiedProperties", propertiesMap));
+    }
+}
+```
+这样，在创建 Bean 时，就能第一优先级使用我们修改过的 PropertySource 了。
 
 ## 小结
 ---
+当然，有了比较正规的方式后，我们不必要对 PropertySource 进行修改，毕竟全局修改等于未知风险。
+
+查找答案的过程中，我对 Spring 的 Environment 有了更深入的理解，了解 Environment、BeanFactory 这些 Spring 的基石，对于理解它表现出来的高级特性很有帮助，之后再查找框架问题也会更有方向。
 
 {{ site.article.summary }}
