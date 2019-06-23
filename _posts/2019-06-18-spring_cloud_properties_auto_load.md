@@ -15,6 +15,8 @@ comments: true
 
 虽然在解决需求问题时走了些弯路，但也借此机会了解了 Spring Cloud 的一部分，抽空总结一下问题和在查询问题中了解到的知识，分享出来让再遇到此问题的同学少踩坑吧。
 
+本文基于 Spring 5.1 和 Spring Cloud 2.1。
+
 {{ site.article.copyright }}
 
 ## 背景和问题
@@ -77,7 +79,7 @@ Spring Cloud 提供了 `ContextRefresher` 来帮助我们实现环境的刷新�
 
 首先是 refreshEnvironment 方法。
 
-```
+```java
 Map<String, Object> before = extract(this.context.getEnvironment().getPropertySources());
 		addConfigFilesToEnvironment();
 		Set<String> keys = changes(before,extract(this.context.getEnvironment().getPropertySources())).keySet();
@@ -86,27 +88,75 @@ Map<String, Object> before = extract(this.context.getEnvironment().getPropertySo
 ```
 
 它读取了环境内所有 PropertySource 内的配置后，重新创建了一个 SpringApplication 以刷新配置，再次读取所有配置项并得到与前面保存的配置项的对比，最后将前后配置差发布了一个 `EnvironmentChangeEvent` 事件。
+而 EnvironmentChangeEvent 的监听器是由 ConfigurationPropertiesRebinder 实现的，其主要逻辑在 `rebind` 方法。
 
-
+```java
+	Object bean = this.applicationContext.getBean(name);
+	if (AopUtils.isAopProxy(bean)) {
+		bean = ProxyUtils.getTargetObject(bean);
+	}
+	if (bean != null) {
+		this.applicationContext.getAutowireCapableBeanFactory().destroyBean(bean);
+                 this.applicationContext.getAutowireCapableBeanFactory().initializeBean(bean, name);
+		return true;
 ```
+可以看到它的处理逻辑，就是把其内部存储的 `ConfigurationPropertiesBeans` 依次执行销毁逻辑，再执行初始化逻辑实现属性的重新绑定。
+
+再来看 scope 的刷新方法：
+
+```java
     public void refreshAll() {
 		super.destroy();
 		this.context.publishEvent(new RefreshScopeRefreshedEvent());
 	}
 ```
-而 scope.refreshAll 则更"野蛮"一些，直接销毁了 scope，并发布了一个 RefreshScopeRefreshedEvent 事件，scope 的销毁会导致 scope 内（被 RefreshScope 注解）所有的 bean 都会被销毁。而这些被强制设置为 lazyInit 的 bean 再次创建时，也就完成了新配置的重新加载。
+scope.refreshAll 则更"野蛮"一些，直接销毁了 scope，并发布了一个 RefreshScopeRefreshedEvent 事件，scope 的销毁会导致 scope 内（被 RefreshScope 注解）所有的 bean 都会被销毁。而这些被强制设置为 lazyInit 的 bean 再次创建时，也就完成了新配置的重新加载。
 
-## 属性的重新绑定
+## Bean 的创建与 Bean 的关系。
 ---
-我们再来看一下  EnvironmentChangeEvent 事件的处理。
+接着我们再来看一下，环境里的属性都是怎么在 Bean 创建时被使用的。
 
+我们知道，Spring 的 Bean 都是在 BeanFactory 内创建的，创建逻辑的入口在 `AbstractBeanFactory.doGetBean(name, requiredType, args, false)` 方法，而具体实现在 `AbstractAutowireCapableBeanFactory.doCreateBean` 方法内，在这个方法里，实现了 Bean 实例的创建、属性填充、初始化方法调用等逻辑。
 
-rebinder 销毁重新创建？
+在这里，有一个非常复杂的步骤就是调用全局的 `BeanPostProcessor`，这个接口是 Spring 为 Bean 创建准备的勾子接口，实现这个接口的类可以对 Bean 创建时的操作进行修改。它是一个非常重要的接口，是我们能干涉 Spring Bean 创建流程的重要入口。
 
+我们要说的是它的一种具体实现 `ConfigurationPropertiesBindingPostProcessor`，它通过调用链 `ConfigurationPropertiesBinder.bind() --> Binder.bindObject() --> Binder.findProperty()` 方法查找环境内的属性。
 
-## 扩展
+```java
+private ConfigurationProperty findProperty(ConfigurationPropertyName name,
+			Context context) {
+		if (name.isEmpty()) {
+			return null;
+		}
+		return context.streamSources()
+				.map((source) -> source.getConfigurationProperty(name))
+				.filter(Objects::nonNull).findFirst().orElse(null);
+	}
+```
+找到对应的属性后，再使用 converter 将属性转换为对应的类型注入到 Bean 骨。
+
+```java
+    private <T> Object bindProperty(Bindable<T> target, Context context,
+			ConfigurationProperty property) {
+		context.setConfigurationProperty(property);
+		Object result = property.getValue();
+		result = this.placeholdersResolver.resolvePlaceholders(result);
+		result = context.getConverter().convert(result, target);
+		return result;
+	}
+```
+
+## 一种 trick 方式
 ---
-修改 env
+由上面可以看到，Spring 是支持 @ConfigurationProperties 属性的动态修改的，但在查询流程时，我也找到了一种比较 trick 的方式。
+
+我们先来整理远程属性注入的关键点，再从这些关键点里找可修改点。
+
+1. PropertySourceLocator 将 PropertySource 从远程数据源引入，如果这时我们能修改数据源的结果就能达到目的，可是 Spring Cloud 的远程资源定位器 ConfigServicePropertySourceLocator 和 远程调用工具 RestTemplate 都是实现类，如果生硬地对其继承并修改，代码很不优雅。
+2. 添加一个 BeanPostProcessor，手动实现对 Bean 属性的修改。实现起来很复杂，而且由于每一个 BeanPostProcessor 在所有 Bean 创建时都会调用，可能会有安全问题。
+3. 添加属性解析器 PropertyResolver 或类型转换器 ConversionService。它们都只负责处理一个属性，由于我们的目标是"多个"属性变成一个属性，它们也无能为力。
+
+
 
 ## 小结
 ---
