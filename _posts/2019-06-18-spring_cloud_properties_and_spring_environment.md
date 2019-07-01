@@ -1,8 +1,8 @@
 ---
 layout: post
-title: "Spring Cloud 的配置管理"
+title: "从 Spring 的环境到 Spring Cloud 的配置"
 category: blog
-tags: [Java, Spring Cloud, config, Properties]
+tags: [Java, Spring Cloud, Config, Environment]
 date: 2019-06-18 08:00:06 +0800
 comments: true
 ---
@@ -11,7 +11,7 @@ comments: true
 ---
 不知不觉，web 开发已经进入 "微服务"、"分布式" 的时代，致力于提供通用 Java 开发解决方案的 Spring 自然不甘人后，提出了 Spring Cloud 来扩大 Spring 在微服务方面的影响，也取得了市场的认可，在我们的业务中也有应用。
 
-前些天，我在一个需求中也遇到了 spring cloud 的相关问题。我们在用的是 Spring Cloud 的 config 模块，它是用来支持分布式配置的，原来单机应用在使用了 Spring Cloud 之后，可以支持配置的动态修改和重新加载，原来我们使用第三方存储配置，自己在业务代码里使用轮询并实现配置的重新加载，Spring Cloud 将其抽离为框架，并很好的融入到 Spring 原有的配置和 Bean 模块内。
+前些天，我在一个需求中也遇到了 spring cloud 的相关问题。我们在用的是 Spring Cloud 的 config 模块，它是用来支持分布式配置的，原来单机配置在使用了 Spring Cloud 之后，可以支持第三方存储配置和配置的动态修改和重新加载，自己在业务代码里实现配置的重新加载，Spring Cloud 将整个流程抽离为框架，并很好的融入到 Spring 原有的配置和 Bean 模块内。
 
 虽然在解决需求问题时走了些弯路，但也借此机会了解了 Spring Cloud 的一部分，抽空总结一下问题和在查询问题中了解到的知识，分享出来让再遇到此问题的同学少踩坑吧。
 
@@ -72,12 +72,24 @@ Spring Cloud 内提供了 `PropertySourceLocator` 接口来对接 Spring 的 Pro
 
 从 `ConfigClientProperties` 这个配置类我们可以看得出来，它也为远程配置预设了用户名密码等安全控制选项，还有 label 用来区分服务池等配置。
 
-#### 配置刷新
+#### scope 配置刷新
 远程配置有了，接下来就是对变化的监测和基于配置变化的刷新。
 
 Spring Cloud 提供了 `ContextRefresher` 来帮助我们实现环境的刷新，其主要逻辑在 `refreshEnvironment` 方法和 `scope.refreshAll()` 方法，我们分开来看。
 
-首先是 refreshEnvironment 方法。
+我们先来看 spring cloud 支持的 scope.refreshAll 方法。
+
+```java
+    public void refreshAll() {
+		super.destroy();
+		this.context.publishEvent(new RefreshScopeRefreshedEvent());
+	}
+```
+scope.refreshAll 则更"野蛮"一些，直接销毁了 scope，并发布了一个 RefreshScopeRefreshedEvent 事件，scope 的销毁会导致 scope 内（被 RefreshScope 注解）所有的 bean 都会被销毁。而这些被强制设置为 lazyInit 的 bean 再次创建时，也就完成了新配置的重新加载。
+
+
+#### ConfigurationProperties 配置刷新
+然后再回过头来看 refreshEnvironment 方法。
 
 ```java
 Map<String, Object> before = extract(this.context.getEnvironment().getPropertySources());
@@ -102,17 +114,11 @@ Map<String, Object> before = extract(this.context.getEnvironment().getPropertySo
 ```
 可以看到它的处理逻辑，就是把其内部存储的 `ConfigurationPropertiesBeans` 依次执行销毁逻辑，再执行初始化逻辑实现属性的重新绑定。
 
-再来看 scope 的刷新方法：
+这里可以知道，Spring Cloud 在进行配置刷新时是考虑过 ConfigurationProperties 的，经过测试，在 ContextRefresher 刷新上下文后，ConfigurationProperties 注解类的属性是会进行动态刷新的。
 
-```java
-    public void refreshAll() {
-		super.destroy();
-		this.context.publishEvent(new RefreshScopeRefreshedEvent());
-	}
-```
-scope.refreshAll 则更"野蛮"一些，直接销毁了 scope，并发布了一个 RefreshScopeRefreshedEvent 事件，scope 的销毁会导致 scope 内（被 RefreshScope 注解）所有的 bean 都会被销毁。而这些被强制设置为 lazyInit 的 bean 再次创建时，也就完成了新配置的重新加载。
+测试一次就解决的事情，感觉有些白忙活了。。不过既然查到这里了，就再往下深入一些。
 
-## Bean 的创建与 Bean 的关系。
+## Bean 的创建与环境
 ---
 接着我们再来看一下，环境里的属性都是怎么在 Bean 创建时被使用的。
 
@@ -150,13 +156,13 @@ private ConfigurationProperty findProperty(ConfigurationPropertyName name,
 ---
 由上面可以看到，Spring 是支持 @ConfigurationProperties 属性的动态修改的，但在查询流程时，我也找到了一种比较 trick 的方式。
 
-我们先来整理远程属性注入的关键点，再从这些关键点里找可修改点。
+我们先来整理动态属性注入的关键点，再从这些关键点里找可修改点。
 
 1. PropertySourceLocator 将 PropertySource 从远程数据源引入，如果这时我们能修改数据源的结果就能达到目的，可是 Spring Cloud 的远程资源定位器 ConfigServicePropertySourceLocator 和 远程调用工具 RestTemplate 都是实现类，如果生硬地对其继承并修改，代码很不优雅。
-2. 添加一个 BeanPostProcessor，手动实现对 Bean 属性的修改。实现起来很复杂，而且由于每一个 BeanPostProcessor 在所有 Bean 创建时都会调用，可能会有安全问题。
-3. 添加属性解析器 PropertyResolver 或类型转换器 ConversionService。它们都只负责处理一个属性，由于我们的目标是"多个"属性变成一个属性，它们也无能为力。
+2. Bean 创建时会依次使用 BeanPostProcessor 对上下文进行操作。这时添加一个 BeanPostProcessor，可以手动实现对 Bean 属性的修改。但这种方式 实现起来很复杂，而且由于每一个 BeanPostProcessor 在所有 Bean 创建时都会调用，可能会有安全问题。
+3. Spring 会在解决类属性注入时，使用 PropertyResolver 将配置项解析为类属性指定的类型。这时候添加属性解析器 PropertyResolver 或类型转换器 ConversionService 可以插手属性的操作。但它们都只负责处理一个属性，由于我的目标是"多个"属性变成一个属性，它们也无能为力。
 
-我这里能想到的方式是借用 Spring 自动注入的能力，如果我们把 Environment Bean 注入到某个类中，然后在类的初始化方法里对 Environment 内的 PropertySource 里进行修改，也可以达成目的，这里贴一下伪代码。
+我这里能想到的方式是借用 Spring 自动注入的能力，把 Environment Bean 注入到某个类中，然后在类的初始化方法里对 Environment 内的 PropertySource 里进行修改，也可以达成目的，这里贴一下伪代码。
 
 ```java
 @Component
@@ -182,10 +188,10 @@ public class ListSupportPropertyResolver {
 ```
 这样，在创建 Bean 时，就能第一优先级使用我们修改过的 PropertySource 了。
 
+当然了，有了比较"正规"的方式后，我们不必要对 PropertySource 进行修改，毕竟全局修改等于未知风险或埋坑。
+
 ## 小结
 ---
-当然，有了比较正规的方式后，我们不必要对 PropertySource 进行修改，毕竟全局修改等于未知风险。
-
-查找答案的过程中，我对 Spring 的 Environment 有了更深入的理解，了解 Environment、BeanFactory 这些 Spring 的基石，对于理解它表现出来的高级特性很有帮助，之后再查找框架问题也会更有方向。
+查找答案的过程中，我更深刻地理解到 Environment、BeanFactory 这些才是 Spring 的基石，框架提供的各种花式功能都是基于它们实现的，对这些知识的掌握，对于理解它表现出来的高级特性很有帮助，之后再查找框架问题也会更有方向。
 
 {{ site.article.summary }}
