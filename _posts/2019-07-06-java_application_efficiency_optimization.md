@@ -83,40 +83,107 @@ RMI TCP Connection(2)-127.0.0.1  TID=2555  STATE=RUNNABLE  CPU_TIME=89 (3.89%)  
 
 不过对于我们的接口来说，信号量隔离模式这些弊端是可以接受的。在修改了 Hystrix 的隔离模式后，接口的平均耗时就稳定了，而且由于方法都在主线程执行，少了 Hystrix 线程池维护和主线程与 Hystrix 线程的上下文切换，系统 CPU 又有进一步下降。
 
-#### 无法按预期熔断
-另外，熔断还有一个问题是它不能按照预期的方式进行，我们认为流量在非常大的情况下应该会持续熔断时，而 Hystrix 总表现为半熔断半执行。
+#### 服务隔离和降级
+另外，熔断还有一个问题是它不能按照预期的方式进行服务隔离和降级，我们认为流量在非常大的情况下应该会持续熔断时，而 Hystrix 总表现为半熔断半执行，我们认为多余的请求不会进入方法内部时，它们偏偏还能同时进行。
 
 开始时，我们对日志进行观察，由于日志被设置成异步，看不到实时日志，而且有大量的报错信息干扰，过程痛苦而低效。后来得知 Hystrix 还有可视化界面后，终于被解救出来。
 
-Hystrix 可视化模式分为服务端和客户端，服务端就是我们要观察的服务，需要在服务内添加一个接口来输出 Metrics 信息。
+Hystrix 可视化模式分为服务端和客户端，服务端就是我们要观察的服务，需要在服务内引入 `hystrix-metrics-event-stream` 包并添加一个接口来输出 Metrics 信息。要将这些信息展示出来，只需要启动 `hystrix-dashboard` 客户端并填入服务端地址即可。
 
+通过可视化界面，Hystrix 的状态就展示得非常清楚了，我们就可以根据这些状态对它的熔断状态进行调估了。在解决了服务内部的性能问题后，就可以通过严格限制方法的并发量来修改服务的拒绝策略了。
 
-```java
-```
+假设接口正常响应时间为 50ms，而服务能容纳的最大 QPS 为 2000，那么可以通过 `2000*50/1000=100` 得到适合的信号量限制，如果被拒绝的错误数过多，可以再添加一些冗余。
 
-另外，还要在客户端将这些信息展示出来。
-
-通过可视化界面，Hystrix 的状态就展示得非常清楚了，我们就可以根据这些状态对它的熔断状态进行调估了。
-
-
-严格限制并发量
+这样，在流量突变时，就可以通过拒绝一部分连接来控制进入服务的总请求数，而在进入服务的总请求里，又严格限制了平均耗时，如果错误数过多，还可以通过熔断来进行降级。两种策略同时进行，就能保证接口的平均响应时长了。
 
 #### 熔断时高负载导致无法恢复
+接下来就要解决服务熔断时，服务负载持续升高，在 QPS 压力降低后服务迟迟无法恢复的问题。
 
-减少日志和异常栈的打印。
+在服务器负载特别高时，使用各种工具来观测服务内部状态，结果都是不靠谱的，因为观测一般都采用打点收集的方式，在观察服务的同时已经改变了服务，例如使用 jtop 在高负载时查看占用 CPU 最高的线程时，获取到的结果总是 JVM TI（[Java 动态字节码技术]({{ site.baseurl }}/2018/11/control_jvm_byte_code.html)） 相关的栈。
 
-日志打印获取异常栈性能低下。
+不过，观察服务外部可以发现，这个时候会有大量的错误日志输出，往往在服务已经稳定好久了，还有之前的错误日志在打印，这一延时单位甚至以分钟计。大量的错误日志不仅造成 I/O 压力，而且线程栈的获取、日志存储内存的分配都很有可能会增加服务器压力。而且我们的服务早因为日志量大而改为了异步日志，这使得阻塞线程的 I/O 屏障也消失了。
 
+要验证这项猜测也很简单，修改服务内的日志记录点，在打印日志时不再打印异常栈，再重写 Spring 框架的 ExceptionHandler，彻底减少日志量的输出。
 
+结果非常符合预期，在错误量极大时，日志输出也被控制在正常范围，这样熔断后，就不会再因为日志给服务增加压力，一旦 QPS 压力下降，熔断开关被关闭，服务很快就能恢复正常状态。
 
 ## Spring 数据绑定异常
 ---
-在查看线程栈时，还偶然发现了另一个奇怪的问题。
+在查看 jstack 输出的线程栈时，还偶然发现了一种奇怪的现象。
 
-spring 参数绑定问题。
+```
+at java.lang.Throwable.fillInStackTrace(Native Method)
+	at java.lang.Throwable.fillInStackTrace(Throwable.java:783)
+	- locked <0x00000006a697a0b8> (a org.springframework.beans.NotWritablePropertyException)
+	at java.lang.Throwable.<init>(Throwable.java:287)
+	at java.lang.Exception.<init>(Exception.java:84)
+	at java.lang.RuntimeException.<init>(RuntimeException.java:80)
+	at org.springframework.core.NestedRuntimeException.<init>(NestedRuntimeException.java:66)
+	at org.springframework.beans.BeansException.<init>(BeansException.java:50)
+	at org.springframework.beans.FatalBeanException.<init>(FatalBeanException.java:45)
+	at org.springframework.beans.InvalidPropertyException.<init>(InvalidPropertyException.java:54)
+	at org.springframework.beans.InvalidPropertyException.<init>(InvalidPropertyException.java:43)
+	at org.springframework.beans.NotWritablePropertyException.<init>(NotWritablePropertyException.java:77)
+	at org.springframework.beans.BeanWrapperImpl.createNotWritablePropertyException(BeanWrapperImpl.java:243)
+	at org.springframework.beans.AbstractNestablePropertyAccessor.processLocalProperty(AbstractNestablePropertyAccessor.java:426)
+	at org.springframework.beans.AbstractNestablePropertyAccessor.setPropertyValue(AbstractNestablePropertyAccessor.java:278)
+	at org.springframework.beans.AbstractNestablePropertyAccessor.setPropertyValue(AbstractNestablePropertyAccessor.java:266)
+	at org.springframework.beans.AbstractPropertyAccessor.setPropertyValues(AbstractPropertyAccessor.java:97)
+	at org.springframework.validation.DataBinder.applyPropertyValues(DataBinder.java:839)
+	at org.springframework.validation.DataBinder.doBind(DataBinder.java:735)
+	at org.springframework.web.bind.WebDataBinder.doBind(WebDataBinder.java:197)
+	at org.springframework.web.bind.ServletRequestDataBinder.bind(ServletRequestDataBinder.java:107)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletModelAttributeMethodProcessor.bindRequestParameters(ServletModelAttributeMethodProcessor.java:157)
+	at org.springframework.web.method.annotation.ModelAttributeMethodProcessor.resolveArgument(ModelAttributeMethodProcessor.java:153)
+	at org.springframework.web.method.support.HandlerMethodArgumentResolverComposite.resolveArgument(HandlerMethodArgumentResolverComposite.java:124)
+	at org.springframework.web.method.support.InvocableHandlerMethod.getMethodArgumentValues(InvocableHandlerMethod.java:161)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:131)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:102)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:877)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:783)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:991)
+```
+多次看到栈顶都停留在 Spring 的异常处理，但这时候也没有日志输出，业务也没有异常，跟进代码看了一下，Spring 竟然偷偷捕获了异常且不做任务处理。
+
+```java
+    List<PropertyAccessException> propertyAccessExceptions = null;
+	List<PropertyValue> propertyValues = (pvs instanceof MutablePropertyValues ?
+			((MutablePropertyValues) pvs).getPropertyValueList() : Arrays.asList(pvs.getPropertyValues()));
+	for (PropertyValue pv : propertyValues) {
+		try {
+			// This method may throw any BeansException, which won't be caught
+			// here, if there is a critical failure such as no matching field.
+			// We can attempt to deal only with less serious exceptions.
+			setPropertyValue(pv);
+		}
+		catch (NotWritablePropertyException ex) {
+			if (!ignoreUnknown) {
+				throw ex;
+			}
+			// Otherwise, just ignore it and continue...
+		}
+		... ...
+	}
+```
+结合上下文再看，原来 Spring 在处理我们的控制器数据绑定，要处理的数据是我们的一个上下文类 ApiContext，它是由多个字段组成的参数传输 Bean。
+
+控制器代码类似于：
+
+```java
+ @RequestMapping("test.json")
+ public Map testApi(@RequestParam(name = "id") String id, ApiContext apiContext) {}
+```
+按照正常的套路，我们为这个 ApiContext 类添加一个参数解析器(HandlerMethodArgumentResolver)，这样 Spring 会在解析这个参数时会调用这个参数解析器为方法生成一个对应类型的参数。
+
+可是如果没有这么一个参数解析器，Spring 会报错吗？
+
+答案是不会，而是会使用上面的那段"奇怪"代码，先创建一个空的 ApiContext 类，并将所有的传入参数依次尝试 set 进这个类，如果 set 失败了，就 catch 住异常继续执行，而 set 成功后，就完成了一次参数绑定。
+
+而不幸的是，我们的接口上层会为我们统一传过来三四十个参数，所以每次都会进行大量的"尝试绑定"，成造成的异常和异常处理就会导致大量的性能损失，在使用参数解析器解决这个问题后，接口性能竟然有近十分之一的提升。
 
 ## 小结
 ---
-
+性能优化不是一朝一夕的事，把技术债都堆到最后一块解决也不是什么好的选择。平时多注意一些代码写法，在使用黑科技时注意一下其实现有没有什么隐藏的坑才是正解，还可以进行定期的性能测试，及时发现并解决代码里引入的不安定因素。
 
 {{ site.article.summary }}
