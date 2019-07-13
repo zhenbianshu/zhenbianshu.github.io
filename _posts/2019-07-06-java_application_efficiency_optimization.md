@@ -66,47 +66,70 @@ RMI TCP Connection(2)-127.0.0.1  TID=2555  STATE=RUNNABLE  CPU_TIME=89 (3.89%)  
 先介绍一下基本情况，我们在控制器接口最外层和内层 RPC 调用处添加了 Hystrix 注解，隔离方式都是线程池模式，接口处超时时间设置为 1000ms，最大线程数是 2000，内部 RPC 调用的超时时间设置为 200ms，最大线程数是 500。
 
 #### 响应时间不正常
-要解决的第一个问题是接口的响应时间不正常。在观察接口的 access 日志时，可以发现接口有耗时为 1200ms 的请求，有些甚至达到了 2000ms 以上。服务正常时，这种情况对于线程池隔离方式是不可能发生的，因为线程池模式下，Hystrix 会创建一个新的线程去执行真正的业务逻辑，而主线程则一直在等待，一旦等待超时，主线程是可以立刻返回的。所以接口耗时超过超时时间，问题很可能发生在 Hystrix 框架层、Spring 框架层或系统层。
+要解决的第一个问题是接口的响应时间不正常。在观察接口的 access 日志时，可以发现接口有耗时为 1200ms 的请求，有些甚至达到了 2000ms 以上。由于线程池模式下，Hystrix 会使用一个异步线程去执行真正的业务逻辑，而主线程则一直在等待，一旦等待超时，主线程是可以立刻返回的。所以接口耗时超过超时时间，问题很可能发生在 Hystrix 框架层、Spring 框架层或系统层。
 
 这时候可以对运行时线程栈来分析，我使用 jstack 打印出线程栈，并将多次打印的结果制作成火焰图（参见 [应用调试工具-火焰图]({{ site.baseurl }}/2019/04/application_debug_tools_flamegraph.html)）来观察。
 
 <img src="/images/2019/hystrix_lock.png" />
 
-如上图，可以看到很多线程都停在 `LockSupport.park(LockSupport.java:175)` 处，这些线程都被锁住了，向下看来源发现是 `HystrixTimer.addTimerListener(HystrixTimer.java:106)`, 而再向下就是我们的业务代码了。
+如上图，可以看到很多线程都停在 `LockSupport.park(LockSupport.java:175)` 处，这些线程都被锁住了，向下看来源发现是 `HystrixTimer.addTimerListener(HystrixTimer.java:106)`, 再向下就是我们的业务代码了。
 
-Hystrix 注释里解释这些 TimerListener 是 HystrixCommand 用来处理异步线程超时的，这些 TimerListener 会在调用超时时执行，将超时结果返回。而在调用量大时，进入线程池时这些 TimerListener 的设置就会因为锁而阻塞，而这些 TimerListener 的设置被阻塞后，就会导致接口设置的超时时间不生效。
+Hystrix 注释里解释这些 TimerListener 是 HystrixCommand 用来处理异步线程超时的，它们会在调用超时时执行，将超时结果返回。而在调用量大时，设置这些 TimerListener 就会因为锁而阻塞，进而导致接口设置的超时时间不生效。
 
-要解决这个问题，只能修改服务的隔离策略了，将 Hystrix 的隔离策略改为信号量模式。信号量模式下，Hystrix 会在每次执行 HystrixCommand 时获取一次信号量，在执行结束后还回。由于信号量的操作效率非常高，而且没有其他附加操作，所以在使用信号量隔离模式时不会有其他性能损耗。
+接着排查调用量为什么 TimerListener 特别多。
 
-但使用信号量隔离模式也要注意一个问题：信号量只能限制方法是否能够进入，如果可以进入执行，则在原来的主线程内执行，执行的过程中 Hystrix 是无法干预的，只能在方法返回后再判断接口是否超时并对超时进行处理，这可能会导致有部分请求耗时超长时，一直占用一个信号量，但框架却无法处理。
+由于服务在多个地方依赖同一个 RPC 返回值，平均一次接口响应会获取同样的值 3-5 次，所以接口内对这个 RPC 的返回值添加了 LocalCache。排查代码发现 HystrixCommand 被添加在了 LocalCache 的 get 方法上，所以单机 QPS 1000 时，会通过 Hystrix 调用方法 3000-5000 次，进而产生大量的 Hystrix TimerListener。
 
-在修改了 Hystrix 的隔离模式后，接口的最大耗时就稳定了，而且由于方法都在主线程执行，少了 Hystrix 线程池维护和主线程与 Hystrix 线程的上下文切换，系统 CPU 使用率又有进一步下降。
+代码类似于：
+
+```java
+    @HystrixCommand(
+            fallbackMethod = "fallBackGetXXXConfig",
+            commandProperties = {
+                    @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds", value = "200"),
+                    @HystrixProperty(name = "circuitBreaker.errorThresholdPercentage", value = "50")},
+            threadPoolProperties = {
+                    @HystrixProperty(name = "coreSize", value = "200"),
+                    @HystrixProperty(name = "maximumSize", value = "500"),
+                    @HystrixProperty(name = "allowMaximumSizeToDivergeFromCoreSize", value = "true")})
+    public XXXConfig getXXXConfig(Long uid) {
+        try {
+            return XXXConfigCache.get(uid);
+        } catch (Exception e) {
+            return EMPTY_XXX_CONFIG;
+        }
+    }
+```
+
+修改代码，将 HystrixCommand 修改到 localCache 的 load 方法上来解决这个问题。此外为了进一步降低 Hystrix 框架对性能的影响，将 Hystrix 的隔离策略改为了信号量模式，之后接口的最大耗时就稳定了。而且由于方法都在主线程执行，少了 Hystrix 线程池维护和主线程与 Hystrix 线程的上下文切换，系统 CPU 使用率又有进一步下降。
+
+但使用信号量隔离模式也要注意一个问题：信号量只能限制方法是否能够进入执行，在方法返回后再判断接口是否超时并对超时进行处理，而无法干预已经在执行的方法，这可能会导致有请求超时时，一直占用一个信号量，但框架却无法处理。
 
 #### 服务隔离和降级
-另一个问题是服务不能按照预期的方式进行服务隔离和降级，我们认为流量在非常大的情况下应该会持续熔断时，而 Hystrix 总表现为半熔断半执行，我们认为多余的请求不会进入方法内部时，它们偏偏还能被执行。
+另一个问题是服务不能按照预期的方式进行服务降级和熔断，我们认为流量在非常大的情况下应该会持续熔断时，而 Hystrix 却表现为偶尔熔断。
 
-开始时，我们对日志进行观察，由于日志被设置成异步，看不到实时日志，而且有大量的报错信息干扰，过程痛苦而低效。后来得知 Hystrix 还有可视化界面后，才算找到正确的调优方式。
+最开始调试 Hystrix 熔断参数时，我们采用日志观察法，由于日志被设置成异步，看不到实时日志，而且有大量的报错信息干扰，过程低效而不准确。后来引入 Hystrix 的可视化界面后，才提升了调试效率。
 
-Hystrix 可视化模式分为服务端和客户端，服务端就是我们要观察的服务，需要在服务内引入 `hystrix-metrics-event-stream` 包并添加一个接口来输出 Metrics 信息。要将这些信息展示出来，只需要启动 `hystrix-dashboard` 客户端并填入服务端地址即可。
+Hystrix 可视化模式分为服务端和客户端，服务端是我们要观察的服务，需要在服务内引入 `hystrix-metrics-event-stream` 包并添加一个接口来输出 Metrics 信息，再启动 `hystrix-dashboard` 客户端并填入服务端地址即可。
 
 <img src="/images/2019/hystrix_dashboard_sample.png" />
 
-通过可视化界面，Hystrix 的整体状态就展示得非常清楚了，我们就可以根据这些状态信息对它的熔断配置进行调整了。由于上文的优化，接口的最大响应时间完全可控，可以通过严格限制接口方法的并发量来修改服务的拒绝策略了。
+通过类似上图的可视化界面，Hystrix 的整体状态就展示得非常清楚了。
 
-假设接口平均响应时间为 50ms，而服务能容纳的最大 QPS 为 2000，那么可以通过 `2000*50/1000=100` 得到适合的信号量限制，如果被拒绝的错误数过多，可以再添加一些冗余。
+由于上文中的优化，接口的最大响应时间已经完全可控，可以通过严格限制接口方法的并发量来修改接口的熔断策略了。
+假设我们能容忍的最大接口平均响应时间为 50ms，而服务能接受的最大 QPS 为 2000，那么可以通过 `2000*50/1000=100` 得到适合的信号量限制，如果被拒绝的错误数过多，可以再添加一些冗余。
 
-这样，在流量突变时，就可以通过拒绝一部分连接来控制进入服务的总请求数，而在进入服务的总请求里，又严格限制了平均耗时，如果错误数过多，还可以通过熔断来进行降级。多种策略同时进行，就能保证接口的平均响应时长了。
+这样，在流量突变时，就可以通过拒绝一部分请求来控制接口接受的总请求数，而在这些总请求里，又严格限制了最大耗时，如果错误数过多，还可以通过熔断来进行降级，多种策略同时进行，就能保证接口的平均响应时长了。
 
 #### 熔断时高负载导致无法恢复
-接下来就要解决服务熔断时，服务负载持续升高，而在 QPS 压力降低后服务迟迟无法恢复的问题。
+接下来就要解决接口熔断时，服务负载持续升高，但在 QPS 压力降低后服务迟迟无法恢复的问题。
 
-在服务器负载特别高时，使用各种工具来观测服务内部状态，结果都是不靠谱的，因为观测一般都采用打点收集的方式，在观察服务的同时已经改变了服务。例如使用 jtop 在高负载时查看占用 CPU 最高的线程时，获取到的结果总是 JVM TI（[Java 动态字节码技术]({{ site.baseurl }}/2018/11/control_jvm_byte_code.html)） 相关的栈。
+在服务器负载特别高时，使用各种工具来观测服务内部状态，结果都是不靠谱的，因为观测一般都采用打点收集的方式，在观察服务的同时已经改变了服务。例如使用 jtop 在高负载时查看占用 CPU 最高的线程时，获取到的结果总是 JVM TI 相关的栈。
 
-不过，观察服务外部可以发现，这个时候会有大量的错误日志输出，往往在服务已经稳定好久了，还有之前的错误日志在打印，延时的单位甚至以分钟计。大量的错误日志不仅造成 I/O 压力，而且线程栈的获取、日志存储内存的分配都很有可能会增加服务器压力。而且我们的服务早因为日志量大而改为了异步日志，这使得通过 I/O 阻塞线程的屏障也消失了。
+不过，观察服务外部可以发现，这个时候会有大量的错误日志输出，往往在服务已经稳定好久了，还有之前的错误日志在打印，延时的单位甚至以分钟计。大量的错误日志不仅造成 I/O 压力，而且线程栈的获取、日志内存的分配都会增加服务器压力。而且服务早因为日志量大改为了异步日志，这使得通过 I/O 阻塞线程的屏障也消失了。
 
-要验证这项猜测也很简单，修改服务内的日志记录点，在打印日志时不再打印异常栈，再重写 Spring 框架的 ExceptionHandler，彻底减少日志量的输出。
-
-结果非常符合预期，在错误量极大时，日志输出也被控制在正常范围，这样熔断后，就不会再因为日志给服务增加压力，一旦 QPS 压力下降，熔断开关被关闭，服务很快就能恢复正常状态。
+之后修改服务内的日志记录点，在打印日志时不再打印异常栈，再重写 Spring 框架的 ExceptionHandler，彻底减少日志量的输出。
+结果符合预期，在错误量极大时，日志输出也被控制在正常范围，这样熔断后，就不会再因为日志给服务增加压力，一旦 QPS 压力下降，熔断开关被关闭，服务很快就能恢复正常状态。
 
 ## Spring 数据绑定异常
 ---
@@ -114,61 +137,45 @@ Hystrix 可视化模式分为服务端和客户端，服务端就是我们要观
 
 ```
 at java.lang.Throwable.fillInStackTrace(Native Method)
-	at java.lang.Throwable.fillInStackTrace(Throwable.java:783)
-	- locked <0x00000006a697a0b8> (a org.springframework.beans.NotWritablePropertyException)
-	at java.lang.Throwable.<init>(Throwable.java:287)
-	at java.lang.Exception.<init>(Exception.java:84)
-	at java.lang.RuntimeException.<init>(RuntimeException.java:80)
-	at org.springframework.core.NestedRuntimeException.<init>(NestedRuntimeException.java:66)
-	at org.springframework.beans.BeansException.<init>(BeansException.java:50)
-	at org.springframework.beans.FatalBeanException.<init>(FatalBeanException.java:45)
-	at org.springframework.beans.InvalidPropertyException.<init>(InvalidPropertyException.java:54)
-	at org.springframework.beans.InvalidPropertyException.<init>(InvalidPropertyException.java:43)
-	at org.springframework.beans.NotWritablePropertyException.<init>(NotWritablePropertyException.java:77)
-	at org.springframework.beans.BeanWrapperImpl.createNotWritablePropertyException(BeanWrapperImpl.java:243)
-	at org.springframework.beans.AbstractNestablePropertyAccessor.processLocalProperty(AbstractNestablePropertyAccessor.java:426)
-	at org.springframework.beans.AbstractNestablePropertyAccessor.setPropertyValue(AbstractNestablePropertyAccessor.java:278)
-	at org.springframework.beans.AbstractNestablePropertyAccessor.setPropertyValue(AbstractNestablePropertyAccessor.java:266)
-	at org.springframework.beans.AbstractPropertyAccessor.setPropertyValues(AbstractPropertyAccessor.java:97)
-	at org.springframework.validation.DataBinder.applyPropertyValues(DataBinder.java:839)
-	at org.springframework.validation.DataBinder.doBind(DataBinder.java:735)
-	at org.springframework.web.bind.WebDataBinder.doBind(WebDataBinder.java:197)
-	at org.springframework.web.bind.ServletRequestDataBinder.bind(ServletRequestDataBinder.java:107)
-	at org.springframework.web.servlet.mvc.method.annotation.ServletModelAttributeMethodProcessor.bindRequestParameters(ServletModelAttributeMethodProcessor.java:157)
-	at org.springframework.web.method.annotation.ModelAttributeMethodProcessor.resolveArgument(ModelAttributeMethodProcessor.java:153)
-	at org.springframework.web.method.support.HandlerMethodArgumentResolverComposite.resolveArgument(HandlerMethodArgumentResolverComposite.java:124)
-	at org.springframework.web.method.support.InvocableHandlerMethod.getMethodArgumentValues(InvocableHandlerMethod.java:161)
-	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:131)
-	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:102)
-	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:877)
-	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:783)
-	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
-	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:991)
+at java.lang.Throwable.fillInStackTrace(Throwable.java:783)
+  - locked <0x00000006a697a0b8> (a org.springframework.beans.NotWritablePropertyException)
+  ...
+org.springframework.beans.AbstractNestablePropertyAccessor.processLocalProperty(AbstractNestablePropertyAccessor.java:426)
+at org.springframework.beans.AbstractNestablePropertyAccessor.setPropertyValue(AbstractNestablePropertyAccessor.java:278)
+  ...
+at org.springframework.validation.DataBinder.doBind(DataBinder.java:735)
+at org.springframework.web.bind.WebDataBinder.doBind(WebDataBinder.java:197)
+at org.springframework.web.bind.ServletRequestDataBinder.bind(ServletRequestDataBinder.java:107)
+at org.springframework.web.method.support.InvocableHandlerMethod.getMethodArgumentValues(InvocableHandlerMethod.java:161)
+ ...
+at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:991)
+
 ```
 
-jstack 的一次输出中，可以看到多个线程的栈顶都停留在 Spring 的异常处理，但这时候也没有日志输出，业务也没有异常，跟进代码看了一下，Spring 竟然偷偷捕获了异常且不做任务处理。
+jstack 的一次输出中，可以看到多个线程的栈顶都停留在 Spring 的异常处理，但这时候也没有日志输出，业务也没有异常，跟进代码看了一下，Spring 竟然偷偷捕获了异常且不做任何处理。
 
 ```java
-    List<PropertyAccessException> propertyAccessExceptions = null;
-	List<PropertyValue> propertyValues = (pvs instanceof MutablePropertyValues ?
-			((MutablePropertyValues) pvs).getPropertyValueList() : Arrays.asList(pvs.getPropertyValues()));
-	for (PropertyValue pv : propertyValues) {
-		try {
-			// This method may throw any BeansException, which won't be caught
-			// here, if there is a critical failure such as no matching field.
-			// We can attempt to deal only with less serious exceptions.
-			setPropertyValue(pv);
-		}
-		catch (NotWritablePropertyException ex) {
-			if (!ignoreUnknown) {
-				throw ex;
-			}
-			// Otherwise, just ignore it and continue...
-		}
-		... ...
-	}
+  List<PropertyAccessException> propertyAccessExceptions = null;
+  List<PropertyValue> propertyValues = (pvs instanceof MutablePropertyValues ?
+      ((MutablePropertyValues) pvs).getPropertyValueList() : Arrays.asList(pvs.getPropertyValues()));
+  for (PropertyValue pv : propertyValues) {
+    try {
+      // This method may throw any BeansException, which won't be caught
+      // here, if there is a critical failure such as no matching field.
+      // We can attempt to deal only with less serious exceptions.
+      setPropertyValue(pv);
+    }
+    catch (NotWritablePropertyException ex) {
+      if (!ignoreUnknown) {
+        throw ex;
+      }
+      // Otherwise, just ignore it and continue...
+    }
+    ... ...
+  }
 ```
-结合代码上下文再看，原来 Spring 在处理我们的控制器数据绑定，要处理的数据是我们的一个上下文类 ApiContext，它是由多个字段组成的参数传输 Bean。
+
+结合代码上下文再看，原来 Spring 在处理我们的控制器数据绑定，要处理的数据是我们的一个参数类 ApiContext。
 
 控制器代码类似于：
 
@@ -176,6 +183,7 @@ jstack 的一次输出中，可以看到多个线程的栈顶都停留在 Spring
  @RequestMapping("test.json")
  public Map testApi(@RequestParam(name = "id") String id, ApiContext apiContext) {}
 ```
+
 按照正常的套路，我们应该为这个 ApiContext 类添加一个参数解析器(HandlerMethodArgumentResolver)，这样 Spring 会在解析这个参数时会调用这个参数解析器为方法生成一个对应类型的参数。可是如果没有这么一个参数解析器，Spring 会怎么处理呢？
 
 答案就是会使用上面的那段"奇怪"代码，先创建一个空的 ApiContext 类，并将所有的传入参数依次尝试 set 进这个类，如果 set 失败了，就 catch 住异常继续执行，而 set 成功后，就完成了 ApiContext 类内一个属性的参数绑定。
