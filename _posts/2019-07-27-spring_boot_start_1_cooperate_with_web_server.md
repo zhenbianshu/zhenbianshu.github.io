@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Spring 启动过程（上）与 Web 服务器合作"
+title: "SpringBoot 启动过程（上）与 Web 服务器合作"
 category: blog
 tags: [Spring, Tomcat]
 date: 2019-07-27 11:00:06 +0800
@@ -71,7 +71,7 @@ public class ServerStarter extends SpringBootServletInitializer {
 
 这种实现方式需要两种新特性的支持：
 
-- Java 1.6 之后新添加了一个类 `java.util.ServiceLoader`，提供了一种新的有别于 ClassLoader 的类发现机制。当我们在 `META-INF/services` 文件夹内添加文件，文件名是全路径的接口，文件内容每一行是全路径的接口实现，就可以通过 `ServiceLoader.load(Class interface)` 方法加载到对应的接口实现。
+- Java 1.6 之后新添加了一个类 `java.util.ServiceLoader`，提供了一种新的有别于 ClassLoader 的类发现机制。当我们在 `META-INF/services` 文件夹内添加文件，文件名是全路径的接口，文件内容每一行是全路径的接口实现，就可以通过 `ServiceLoader.load(Class interface)` 方法加载到对应的接口实现，这种机制就是 `SPI` (Service Provider Interface)，使用这种机制，加载用户实现的特定接口时就不需要类加载器扫描所有的类文件了。不过如果要加载的接口是 Java 底层类时，类加载器会是 BootstrapClassLoader 或 ExtClassLoader，加载子类时需要指定使用 classLoader 为 currentThreadClassLoader (一般是加载应用的 AppClassLoader)。
 - Servlet 3.0+ 提供了另一种替代 web.xml 的 Servlet 配置机制 `ServletContainerInitializer` 接口，Tomcat 会在 Servlet 容器创建后调用 ServletContainerInitializer.onStartup() 方法，便于我们向容器内注册一些 Servlet 对象。
 
 我一路跟随文档向上查看，总结了一下整个流程。
