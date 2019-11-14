@@ -3,7 +3,7 @@ layout: post
 title: "新家庭成员-薄荷"
 date: 2019-10-11 10:00:06 +0800
 comments: true
-category: thoughts
+category: experience
 ---
 
 ## 猫太可爱了
