@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Spring 启动过程（下）组件初始化"
+title: "SpringBoot 启动过程（下）组件初始化"
 category: blog
 tags: [Spring, Tomcat]
 date: 2019-08-17 11:00:06 +0800
