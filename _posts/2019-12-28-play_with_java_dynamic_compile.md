@@ -5,7 +5,6 @@ date: 2019-12-28 10:00:06 +0800
 category: blog
 tags: [Java, Class Load, Byte Code]
 comments: true
-hidden: true
 
 ---
 ## 背景
@@ -13,7 +12,7 @@ hidden: true
 #### 问题
 之前的文章 [从 Spring 的环境到 Spring Cloud 的配置]({{ site.baseurl }}/2019/06/spring_cloud_properties_and_spring_environment.html) 中提到过我们在使用 Spring Cloud 进行动态化配置，它的实现步骤是先将动态配置通过 `@Value` 注入到一个动态配置 Bean，并将这个 Bean 用注解标记为 `@RefreshScope`，在配置变更后，这些动态配置 Bean 会被统一销毁，之后 Spring Cloud 的 `ContextRefresher` 会将变更后的配置作为一个新的 Spring Environment 加载进 ApplicationContext，由于 Scoped Bean 都是 Lazy Init 的，它们会在下一次使用时被使用新的 Environment 重新创建。
 
-这套动态配置加载流程在使我们服务更加灵活的同时，也带来了很大的风险。首先从业务上，修改配置不像上线这么"重量级"，不必要找 QA 进行回归测试，这就有可能引发一系列奇怪的 Bug，而长时间发现不了，另外，Spring Cloud 本身没有 "fallback" 机制，一旦配置的数据类型出了问题，就会导致服务不可用。为此，我给 Spring Cloud 提了个 issue [scope refreshed but new properties invalid leads to application unavailable](https://github.com/spring-cloud/spring-cloud-commons/issues/648) ，但作者认为变动太大，不好改也不必改。
+这套动态配置加载流程在使我们服务更加灵活的同时，也带来了很大的风险。首先从业务上，修改配置不像上线这么"重量级"，不必要找 QA 进行回归测试，这就有可能引发一系列奇怪的 Bug，而且长时间发现不了，另外，Spring Cloud 本身没有 "fallback" 机制，一旦配置的数据类型出了问题，就会导致服务不可用。为此，我给 Spring Cloud 提了个 issue [scope refreshed but new properties invalid leads to application unavailable](https://github.com/spring-cloud/spring-cloud-commons/issues/648) ，但作者认为变动太大，不好改也不必改。
 
 其实我也明白这个问题的困境，每个人都得为自己要修改的配置负责，即使框架支持了 fallback，但将错误吞掉，配置修改后不生效也没什么变化可能也并不符合用户的期望。所以，尽量让用户要修改的配置正确成为了新的目标。
 
@@ -60,10 +59,10 @@ JavaCompiler 的典型应用示例如下：
 
 ## Spring Bean 实例化
 ---
-我们可以在 xml 里预定义 Config 类的 Bean 实例，在编译结束后创建一个简易的 `FileSystemXmlApplicationContext` 实例化 xml 内的 Bean。
+要将 Config 类实例化成 Bean，我们可以在 xml 里预定义它，在编译结束后创建一个简易的 `FileSystemXmlApplicationContext` 实例化这个 xml 内的 Bean。
 
 #### 类加载器
-接下来要让 Spring 能够加载到这些编译好的字节码，这就需要 ClassLoader 的配合。类加载器的默认实现不可能知道去加载我们内存里编译好的字节码，只好新加一个 ClassLoader 实现，实现也很简单，继承 `ClassLoader` 抽象类，并实现 `findClass` 方法即可。
+首先要让 Spring 能够加载到这些编译好的字节码，这就需要 ClassLoader 的配合。类加载器的默认实现不可能知道去加载我们内存里编译好的字节码，只好新加一个 ClassLoader，实现也很简单，继承 `ClassLoader` 抽象类，并实现 `findClass` 方法即可。
 
 ```java
 class MemoryClassLoader extends ClassLoader {
@@ -91,7 +90,7 @@ class MemoryClassLoader extends ClassLoader {
         MapPropertySource mapPropertySource = new MapPropertySource("validate_source", propertyMap);
         applicationContext.getEnvironment().getPropertySources().addFirst(mapPropertySource);
         applicationContext.refresh();
-        applicationContext.getBean("validator");
+        applicationContext.getBean("config");
 
 ```
 
