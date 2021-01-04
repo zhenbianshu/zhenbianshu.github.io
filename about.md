@@ -11,9 +11,9 @@ title: "About"
 ## Experience
 ---
 - 2012.09 - 2016.07 SXAU.CS.bachelor
-- 2016.03 - 2017.04 Beebank.Pay.Developer
-- 2017.04 - 2018.01 Weibo.LBS.Developer
-- 2018.01 - {{ site.time | date: "%Y.%m" }}    Weibo.Video.Developer
+- 2016.03 - 2017.04 Beebank.Developer
+- 2017.04 - 2020.12 Weibo.Developer
+- 2020.01 - {{ site.time | date: "%Y.%m" }}    Meituan.Developer
 
 ## Contact
 ---
