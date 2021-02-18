@@ -2,7 +2,7 @@
 layout: post
 title: "2021回乡见闻"
 date: 2021-02-15 17:00:06 +0800
-category: summary
+category: experience
 comments: true
 ---
 
